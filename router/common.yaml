@@ -1,0 +1,8 @@
+button:
+  - platform: restart
+    name: "Restart"
+
+sensor:
+  - platform: uptime
+    type: seconds
+    name: Uptime Sensor

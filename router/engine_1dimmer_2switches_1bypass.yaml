@@ -1,0 +1,311 @@
+# ----------------------------------------------------------------------------------------------------
+# User interaction
+# ----------------------------------------------------------------------------------------------------
+<<: !include engine_common.yaml
+
+sensor:
+  - platform: template
+    name: "Relay 1 Countdown"
+    id: relay_1_tempo_counter
+    device_class: "duration"
+    state_class: "measurement"
+    filters:
+      - clamp:
+          min_value: 0
+  - platform: template
+    name: "Relay 2 Countdown"
+    id: relay_2_tempo_counter
+    device_class: "duration"
+    state_class: "measurement"
+    filters:
+      - clamp:
+          min_value: 0
+  - platform: template
+    name: "Relay 3 Countdown"
+    id: relay_3_tempo_counter
+    device_class: "duration"
+    state_class: "measurement"
+    filters:
+      - clamp:
+          min_value: 0
+  - platform: template
+    name: "Regulator Opening"
+    id: regulator_opening_sensor
+    lambda: return id(regulator_opening).state;
+    unit_of_measurement: "%"
+    accuracy_decimals: 8
+    update_interval: 1s
+
+binary_sensor:
+  - platform: switch
+    name: "Relay 1"
+    id: relay_1_sensor
+    source_id: relay_1
+  - platform: switch
+    name: "Relay 2"
+    id: relay_2_sensor
+    source_id: relay_2
+  - platform: switch
+    name: "Relay 3"
+    id: relay_3_sensor
+    source_id: relay_3
+
+switch:
+  # Define is router is active or not
+  # When switch is ON, pooling timer will trigger every seconds
+  - platform: template
+    name: "Activate Solar Routing"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    id: activate
+    on_turn_on:
+      then:
+        - lambda: |-
+            id(relay_1_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_2_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_3_tempo_counter).publish_state(id(relay_duration).state);
+            id(power_meter_activated) = 1;
+    on_turn_off:
+      then:
+        - number.to_min: router_level
+        - lambda: |- 
+            id(relay_1_tempo_counter).publish_state(0);
+            id(relay_2_tempo_counter).publish_state(0);
+            id(relay_3_tempo_counter).publish_state(0);
+            id(real_power).publish_state(NAN);
+            id(consumption).publish_state(NAN);
+            id(power_meter_activated) = 0;
+  - platform: template
+    name: "Relay 1"
+    id: relay_1
+    optimistic: True
+    disabled_by_default: True
+    on_turn_on:
+      then:
+        - lambda: id(regulator_opening).publish_state(0);
+        - script.execute: relay_1_control
+    on_turn_off:
+      then:
+        - script.execute: relay_1_control
+  - platform: template
+    name: "Relay 2"
+    id: relay_2
+    optimistic: True
+    disabled_by_default: True
+    on_turn_on:
+      then:
+        - lambda: id(regulator_opening).publish_state(0);
+        - script.execute: relay_2_control
+    on_turn_off:
+      then:
+        - script.execute: relay_2_control
+  - platform: template
+    name: "Relay 3"
+    id: relay_3
+    optimistic: True
+    disabled_by_default: True
+    on_turn_on:
+      then:
+        - script.execute: relay_3_control
+        - lambda: id(regulator_opening).publish_state(0);
+    on_turn_off:
+      then:
+        - script.execute: relay_3_control
+
+
+number:
+  # Router level from 0 to 100
+  # This value serves two purposes:
+  # 1. When solar routing is disabled: Acts as a manual control to set the router level
+  # 2. When solar routing is enabled: Automatically updated to reflect the current router level
+  #    Note: Manual adjustments via slider while routing is enabled are not recommended as they will be
+  #          immediately overridden by the solar router's automatic control
+  - platform: template
+    name: "Router Level"
+    id: router_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: True
+    mode: slider
+    on_value:
+      then:
+        - lambda: |-
+            double current_router_level = id(router_level).state;
+            if (current_router_level >= 100.0) {
+              id(relay_1).turn_on();
+              id(relay_2).turn_on();
+              if (id(relay_3_tempo_counter).state <= 0) {
+                id(relay_3).turn_on();
+              } else {
+                id(relay_3).turn_off();
+                id(regulator_opening).publish_state(100.0);
+              }
+            } else if (current_router_level >= 66.66666666) {
+              id(relay_1).turn_on();
+              id(relay_3).turn_off();
+              if (id(relay_2_tempo_counter).state <= 0) {
+                id(relay_2).turn_on();
+                id(regulator_opening).publish_state(3.0 * current_router_level - 200);
+              } else {
+                id(relay_2).turn_off();
+                id(regulator_opening).publish_state(100.0);
+              }
+            } else if (current_router_level >= 33.33333333) {
+              id(relay_2).turn_off();
+              id(relay_3).turn_off();
+              if (id(relay_1_tempo_counter).state <= 0) {
+                id(relay_1).turn_on();
+                id(regulator_opening).publish_state(3.0 * current_router_level - 100);
+              } else {
+                id(relay_1).turn_off();
+                id(regulator_opening).publish_state(100.0);
+              }
+            } else {
+              id(relay_1).turn_off();
+              id(relay_2).turn_off();
+              id(relay_3).turn_off();
+              id(regulator_opening).publish_state(3.0 * current_router_level);
+            }
+  - platform: template
+    name: "Regulator Openin Control"
+    id: regulator_opening
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: True
+    mode: slider
+    disabled_by_default: True
+    on_value:
+      then:
+        - script.execute: regulation_control
+  - platform: template
+    name: "Relay Duration"
+    id: relay_duration
+    optimistic: True
+    min_value: 0
+    max_value: 3600
+    step: 1
+    initial_value: 30
+    restore_value: True
+    on_value:
+      then:
+        - lambda: |-
+            id(relay_1_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_2_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_3_tempo_counter).publish_state(id(relay_duration).state);
+
+  # Define the reactivity of router level
+  - platform: template
+    name: "Reactivity" 
+    id: reactivity
+    optimistic: True
+    restore_value: True
+    mode: box
+    min_value: 1
+    max_value: 100
+    initial_value: 10
+    unit_of_measurement: ""
+    step: 1
+    on_value:
+      then:
+        - lambda: |-
+            if (id(down_reactivity).state == 0) {
+              id(down_reactivity).publish_state(id(reactivity).state);
+            }
+  - platform: template
+    name: "Down Reactivity"
+    id: down_reactivity
+    optimistic: True
+    restore_value: True
+    mode: box
+    min_value: 1
+    max_value: 100
+    initial_value: 0
+    unit_of_measurement: ""
+    step: 1
+    disabled_by_default: True
+  # Define the target level of grid exchange
+  #   0 : no exchange
+  #  <0 : continue the send energy to the grid
+  #  >0 : pull energy from the grid to better confort
+  - platform: template
+    name: "Target grid exchange"
+    id: target_grid_exchange
+    optimistic: True
+    restore_value: True
+    mode: box
+    min_value: -99999
+    max_value: 99999
+    initial_value: 0
+    unit_of_measurement: "W"
+    step: 1
+
+# ----------------------------------------------------------------------------------------------------
+# Define scripts for power collection or energy regulation
+# ----------------------------------------------------------------------------------------------------
+
+script:
+  # Manage energy regulation
+  # Calculate the delta of percentage to apply to the router level status to go closer to the
+  # objective. Closer we are to the objective smaller are the steps. Reactivity parameter is
+  # doing a ponderation on this parameter to avoid resonance effects.
+  - id: energy_regulation
+    mode: single
+    then:
+      # Define the reouter level based on power measured and grid exchange target
+      # The value of regulator is a precentage and is then limited to the range 0 100
+      - lambda: |-
+          // Safety check: Disable regulation if power readings are invalid or safety is triggered
+          if (isnan(id(real_power).state) or id(safety_limit)){
+            id(router_level).publish_state(0);
+            id(relay_1_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_2_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_3_tempo_counter).publish_state(id(relay_duration).state);
+            return;
+          }
+
+          // Calculate the power difference and adjust the regulator opening percentage
+          double real_power_state = id(real_power).state;
+          double target_grid_exchange_state = id(target_grid_exchange).state;
+          double reactivity_state = NAN;
+          if (real_power_state >= target_grid_exchange_state) {
+              reactivity_state = id(down_reactivity).state;
+          } else {
+              reactivity_state = id(reactivity).state;
+          }
+    
+          double delta = -1*(real_power_state-target_grid_exchange_state)*reactivity_state/3000;
+          // Determine the new regulator status
+          double new_router_level = id(router_level).state + delta;
+          new_router_level = std::max(0.0, std::min(100.0, new_router_level));
+
+          if (new_router_level >= 100.0) {
+            id(relay_3_tempo_counter).publish_state(id(relay_3_tempo_counter).state - 1);
+            id(relay_2_tempo_counter).publish_state(0);
+            id(relay_1_tempo_counter).publish_state(0);
+          } else if (new_router_level >= 66.66666666) {
+            if (id(relay_2_tempo_counter).state > 0) {
+              new_router_level = 66.66666666;
+            }
+
+            id(relay_3_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_2_tempo_counter).publish_state(id(relay_2_tempo_counter).state - 1);
+            id(relay_1_tempo_counter).publish_state(0);
+          } else if (new_router_level >= 33.33333333) {
+            if (id(relay_1_tempo_counter).state > 0) {
+              new_router_level = 33.33333333;
+            }
+
+            id(relay_3_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_2_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_1_tempo_counter).publish_state(id(relay_1_tempo_counter).state - 1);
+          } else {
+            id(relay_3_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_2_tempo_counter).publish_state(id(relay_duration).state);
+            id(relay_1_tempo_counter).publish_state(id(relay_duration).state);
+          }
+
+          id(router_level).publish_state(new_router_level);

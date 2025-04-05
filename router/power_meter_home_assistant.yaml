@@ -1,0 +1,32 @@
+<<: !include power_meter_common.yaml
+
+# ----------------------------------------------------------------------------------------------------
+# Define sensor for power collection
+# ----------------------------------------------------------------------------------------------------
+
+sensor:
+  # Sensor showing the actual power exchange
+  - platform: homeassistant
+    id: real_power
+    entity_id: ${main_power_sensor}
+    internal: False
+    name: "Real Power"
+    device_class: "power"
+    unit_of_measurement: "W"
+    # on_value on copy sensor doesn't work
+    on_value:
+      then:
+        - if:
+            condition:
+              - switch.is_on: activate
+            then:
+              - script.execute: energy_regulation
+
+  # Sensor showing the actual consumption
+  - platform: homeassistant
+    id: consumption
+    entity_id: ${consumption_sensor}
+    internal: False
+    name: "Consumption"
+    device_class: "power"
+    unit_of_measurement: "W"

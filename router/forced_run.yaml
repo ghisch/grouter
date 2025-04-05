@@ -1,0 +1,24 @@
+binary_sensor:
+  - platform: homeassistant
+    id: force_enable_load
+    entity_id: ${force_run_sensor} 
+    internal: True 
+
+time:
+  - platform: sntp
+    on_time:
+      # Disable Router then set level to 100
+      - cron: ${force_run_on_cron}
+        then:
+          - lambda: |-
+              if (isnan(id(force_enable_load).state) or id(force_enable_load).state) {
+                id(activate).publish_state(false);
+                id(router_level).publish_state(100);
+                return;
+              }
+      # set level to 0 then Enable Router
+      - cron: ${force_run_off_cron}
+	then:
+          - lambda: |-
+              id(router_level).publish_state(0);
+              id(activate).publish_state(true);
