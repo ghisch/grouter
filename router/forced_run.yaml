@@ -18,7 +18,7 @@ time:
               }
       # set level to 0 then Enable Router
       - cron: ${force_run_off_cron}
-	then:
+        then:
           - lambda: |-
               id(router_level).publish_state(0);
               id(activate).publish_state(true);
