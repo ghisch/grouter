@@ -10,6 +10,9 @@ text_sensor:
       name: "Reset Reason"
 
 sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"
+    update_interval: 60s
   - platform: debug
     free:
       name: "Heap Free"
