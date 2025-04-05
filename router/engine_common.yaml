@@ -1,0 +1,38 @@
+# ----------------------------------------------------------------------------------------------------
+# User interaction
+# ----------------------------------------------------------------------------------------------------
+
+globals:
+  # By default, if no temperature package is used, safety_limit is disabled
+  - id: safety_limit
+    type: bool
+    initial_value: "false"
+
+sensor:
+  - platform: copy
+    source_id: real_power
+    name: "Real Power Internal"
+    id: real_power_internal
+    internal: False
+    # on_value on copy sensor doesn't work
+    on_value:
+      then:
+        - if:
+            condition:
+              - switch.is_on: activate
+            then:
+              - script.execute: energy_regulation
+
+# Component managing time.
+# If activate switch is ON, power measurment and energy regulation are performed every secondes
+time:
+  - platform: sntp
+    on_time:
+      # Trigger action every second
+      - seconds: /10
+        then:
+          - if:
+              condition:
+                - switch.is_on: activate
+              then:
+                - script.execute: energy_regulation
