@@ -66,10 +66,13 @@ sensor:
 time:
   - platform: homeassistant
     id: homeassistant_time_for_solar_router
-
   - platform: sntp
     on_time:
       # Trigger action every second
       - seconds: /1
         then:
-          - script.execute: energy_diverted_counter
+          - if:
+              condition:
+                - switch.is_on: activate
+              then:
+                - script.execute: energy_diverted_counter

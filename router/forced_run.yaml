@@ -14,7 +14,6 @@ time:
               if (isnan(id(force_enable_load).state) or id(force_enable_load).state) {
                 id(activate).publish_state(false);
                 id(router_level).publish_state(100);
-                return;
               }
       # set level to 0 then Enable Router
       - cron: ${force_run_off_cron}
