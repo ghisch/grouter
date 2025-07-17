@@ -4,8 +4,6 @@ sensor:
     id: wifi_signal_db
     update_interval: 60s
     entity_category: "diagnostic"
-  - platform: uptime
-    name: Uptime Sensor
   - platform: copy # Reports the WiFi signal strength in %
     source_id: wifi_signal_db
     name: "WiFi Signal Percent"
