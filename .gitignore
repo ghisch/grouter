@@ -1,0 +1,32 @@
+# ESPHome generated files
+.esphome/
+**/secrets.yaml
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Compiled test binaries
+*.o
+test_triac
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+._*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Temporary build paths
+/tmp/

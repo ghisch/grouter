@@ -1,0 +1,125 @@
+# ============================================================================
+# Grouter - Theoretical Energy Counter
+# ============================================================================
+# Estimates energy diverted to load based on router level and configured
+# load power. Provides daily totals for Home Assistant Energy Dashboard.
+# ============================================================================
+
+number:
+  # --------------------------------------------------------------------------
+  # Load Power Configuration
+  # --------------------------------------------------------------------------
+  # Total power of the connected load (e.g., 2400W for 3x800W heaters).
+  # Used to calculate theoretical energy diversion.
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Load Power"
+    id: load_power
+    icon: mdi:lightning-bolt
+    min_value: 0
+    max_value: 99999
+    step: 1
+    unit_of_measurement: "W"
+    initial_value: ${energy.default_load_power}
+    restore_value: true
+    optimistic: true
+
+binary_sensor:
+  # --------------------------------------------------------------------------
+  # Load Thermostat Detection
+  # --------------------------------------------------------------------------
+  # Detects when the load's internal thermostat has turned off heating.
+  #
+  # For water heaters: When water reaches target temperature, the thermostat
+  # cuts power even though the router is still sending energy. This is detected
+  # when home consumption is lower than the theoretical diverted power.
+  #
+  # True = Load thermostat is OFF (water is hot enough)
+  # False = Load is actively consuming power
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Load Thermostat Off"
+    id: load_thermostat_off
+    icon: mdi:thermometer-check
+    device_class: heat
+
+sensor:
+  # --------------------------------------------------------------------------
+  # Total Daily Energy Diverted
+  # --------------------------------------------------------------------------
+  # Accumulates diverted energy throughout the day.
+  # Resets at midnight. Compatible with HA Energy Dashboard.
+  # --------------------------------------------------------------------------
+  - platform: total_daily_energy
+    name: "Total Energy Diverted"
+    id: energy_diverted
+    icon: mdi:counter
+    power_id: power_diversion
+    unit_of_measurement: "kWh"
+    state_class: total_increasing
+    device_class: energy
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001  # W to kW
+
+  # --------------------------------------------------------------------------
+  # Current Power Diversion
+  # --------------------------------------------------------------------------
+  # Instantaneous power being diverted (load_power × router_level / 100).
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Power Diversion"
+    id: power_diversion
+    icon: mdi:flash
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+
+# Global to track last thermostat state (avoid redundant publishes)
+globals:
+  - id: last_thermostat_state
+    type: bool
+    initial_value: "false"
+
+script:
+  # --------------------------------------------------------------------------
+  # Energy Diverted Counter
+  # --------------------------------------------------------------------------
+  # Updates the power_diversion sensor based on router level.
+  # Also checks if consumption matches expected diversion (thermostat detection).
+  # --------------------------------------------------------------------------
+  - id: energy_diverted_counter
+    mode: single
+    then:
+      - lambda: |-
+          const double diverted = id(load_power).state * id(router_level).state / 100.0;
+          const double cons = id(consumption).state;
+          const bool thermostat_off = !isnan(cons) && cons < diverted;
+
+          if (thermostat_off) {
+            // Consumption lower than expected - load thermostat has cut off
+            id(power_diversion).publish_state(0.0);
+          } else {
+            // Consumption matches or exceeds diversion - load is actively heating
+            id(power_diversion).publish_state(diverted);
+          }
+
+          // Only publish thermostat state if changed
+          if (id(last_thermostat_state) != thermostat_off) {
+            id(load_thermostat_off).publish_state(thermostat_off);
+            id(last_thermostat_state) = thermostat_off;
+          }
+
+time:
+  - platform: homeassistant
+    id: ha_time
+  - platform: sntp
+    on_time:
+      # Update energy counter every 5 seconds (was 1s - reduces CPU load by 80%)
+      - seconds: /5
+        then:
+          - if:
+              condition:
+                switch.is_on: activate
+              then:
+                - script.execute: energy_diverted_counter

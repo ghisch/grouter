@@ -1,0 +1,214 @@
+# ============================================================================
+# Grouter - User Controls
+# ============================================================================
+# Switches and numbers exposed to Home Assistant for user interaction.
+# Consistent naming: "Title Case" for display names, snake_case for IDs.
+# ============================================================================
+
+switch:
+  # --------------------------------------------------------------------------
+  # Main Activation Switch
+  # --------------------------------------------------------------------------
+  # Enables/disables automatic solar routing.
+  # When OFF, router level can be manually controlled via slider.
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Solar Routing"
+    id: activate
+    icon: mdi:solar-power
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - lambda: |-
+            // Initialize relay countdowns
+            const float duration = id(relay_duration).state;
+            id(relay_1_countdown).publish_state(duration);
+            id(relay_2_countdown).publish_state(duration);
+            id(relay_3_countdown).publish_state(duration);
+            id(power_meter_activated) = true;
+    on_turn_off:
+      then:
+        - number.to_min: router_level
+        - lambda: |-
+            // Reset all states
+            id(relay_1_countdown).publish_state(0);
+            id(relay_2_countdown).publish_state(0);
+            id(relay_3_countdown).publish_state(0);
+            id(real_power).publish_state(NAN);
+            id(consumption).publish_state(NAN);
+            id(power_meter_activated) = false;
+
+number:
+  # --------------------------------------------------------------------------
+  # Router Level (0-100%)
+  # --------------------------------------------------------------------------
+  # Primary control output. Determines power sent to load.
+  # - Manual mode: User sets level directly
+  # - Auto mode: Algorithm adjusts based on grid power
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Router Level"
+    id: router_level
+    icon: mdi:gauge
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: true
+    mode: slider
+    on_value:
+      then:
+        - lambda: |-
+            const double level = id(router_level).state;
+            const double t1 = ${thresholds.relay_1};
+            const double t2 = ${thresholds.relay_2};
+            const double t3 = ${thresholds.relay_3};
+
+            if (level >= t3) {
+              // 100%: All relays ON
+              id(relay_1).turn_on();
+              id(relay_2).turn_on();
+              if (id(relay_3_countdown).state <= 0) {
+                id(relay_3).turn_on();
+              } else {
+                id(relay_3).turn_off();
+                id(regulator_opening).publish_state(100.0);
+              }
+            } else if (level >= t2) {
+              // 66-100%: Relay 1+2 ON, dimmer controls remainder
+              id(relay_1).turn_on();
+              id(relay_3).turn_off();
+              if (id(relay_2_countdown).state <= 0) {
+                id(relay_2).turn_on();
+                id(regulator_opening).publish_state(3.0 * level - 200.0);
+              } else {
+                id(relay_2).turn_off();
+                id(regulator_opening).publish_state(100.0);
+              }
+            } else if (level >= t1) {
+              // 33-66%: Relay 1 ON, dimmer controls remainder
+              id(relay_2).turn_off();
+              id(relay_3).turn_off();
+              if (id(relay_1_countdown).state <= 0) {
+                id(relay_1).turn_on();
+                id(regulator_opening).publish_state(3.0 * level - 100.0);
+              } else {
+                id(relay_1).turn_off();
+                id(regulator_opening).publish_state(100.0);
+              }
+            } else {
+              // 0-33%: All relays OFF, dimmer only
+              id(relay_1).turn_off();
+              id(relay_2).turn_off();
+              id(relay_3).turn_off();
+              id(regulator_opening).publish_state(3.0 * level);
+            }
+
+  # --------------------------------------------------------------------------
+  # Regulator Opening (0-100%)
+  # --------------------------------------------------------------------------
+  # Controls the AC dimmer brightness. Normally set automatically.
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Regulator Opening"
+    id: regulator_opening
+    icon: mdi:knob
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: true
+    mode: slider
+    disabled_by_default: true
+    on_value:
+      then:
+        - script.execute: regulation_control
+
+  # --------------------------------------------------------------------------
+  # Relay Anti-Cycle Duration (in regulation cycles)
+  # --------------------------------------------------------------------------
+  # Number of regulation cycles before a relay can be re-enabled after being
+  # disabled. Prevents rapid on/off cycling that could damage relays.
+  #
+  # NOTE: This is NOT in seconds! One cycle = one regulation trigger, which
+  # occurs on every power meter update OR every ${regulation.interval} seconds.
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Relay Duration"
+    id: relay_duration
+    icon: mdi:timer-outline
+    min_value: 0
+    max_value: 3600
+    step: 1
+    initial_value: ${relay.anti_cycle_duration}
+    restore_value: true
+    unit_of_measurement: "cycles"
+    optimistic: true
+    on_value:
+      then:
+        - lambda: |-
+            const float duration = id(relay_duration).state;
+            id(relay_1_countdown).publish_state(duration);
+            id(relay_2_countdown).publish_state(duration);
+            id(relay_3_countdown).publish_state(duration);
+
+  # --------------------------------------------------------------------------
+  # Reactivity Controls
+  # --------------------------------------------------------------------------
+  # How aggressively the router adjusts to power changes.
+  # Higher = faster response but may oscillate.
+  # Lower = smoother but slower to reach target.
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Reactivity"
+    id: reactivity
+    icon: mdi:speedometer
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 10
+    restore_value: true
+    optimistic: true
+    mode: box
+    on_value:
+      then:
+        - lambda: |-
+            // Sync down_reactivity if not explicitly set
+            if (id(down_reactivity).state == 0) {
+              id(down_reactivity).publish_state(id(reactivity).state);
+            }
+
+  - platform: template
+    name: "Down Reactivity"
+    id: down_reactivity
+    icon: mdi:speedometer-slow
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 0
+    restore_value: true
+    optimistic: true
+    mode: box
+    disabled_by_default: true
+
+  # --------------------------------------------------------------------------
+  # Target Grid Exchange
+  # --------------------------------------------------------------------------
+  # Target power level at the grid meter.
+  #   0W  = Zero exchange (self-consumption)
+  #  <0W  = Export some power to grid
+  #  >0W  = Allow some grid import for comfort
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Target Grid Exchange"
+    id: target_grid_exchange
+    icon: mdi:transmission-tower
+    min_value: -99999
+    max_value: 99999
+    step: 1
+    initial_value: 0
+    restore_value: true
+    unit_of_measurement: "W"
+    optimistic: true
+    mode: box

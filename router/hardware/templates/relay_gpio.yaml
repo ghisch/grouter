@@ -1,0 +1,7 @@
+# Relay GPIO output template
+# Usage: !include { file: templates/relay_gpio.yaml, vars: { num: "1", pin: "${pins.relay_1}" } }
+platform: gpio
+id: relay_${num}_gpio
+pin:
+  number: ${pin}
+  inverted: true  # Active LOW relay board

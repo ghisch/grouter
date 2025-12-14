@@ -1,0 +1,32 @@
+# ============================================================================
+# Grouter - Status Sensors
+# ============================================================================
+# Sensors exposed to Home Assistant for monitoring.
+# Consistent naming: "Title Case" for display names, snake_case for IDs.
+# ============================================================================
+
+sensor:
+  # --------------------------------------------------------------------------
+  # Relay Countdowns (in regulation cycles, NOT seconds!)
+  # --------------------------------------------------------------------------
+  # Cycles remaining before each relay can be activated.
+  # Shows 0 when relay is ready, counts down by 1 each regulation cycle.
+  # Regulation triggers on: power meter changes OR every interval seconds.
+  # --------------------------------------------------------------------------
+  - <<: !include { file: templates/countdown_sensor.yaml, vars: { num: "1" } }
+  - <<: !include { file: templates/countdown_sensor.yaml, vars: { num: "2" } }
+  - <<: !include { file: templates/countdown_sensor.yaml, vars: { num: "3" } }
+
+  # --------------------------------------------------------------------------
+  # Regulator Opening Sensor
+  # --------------------------------------------------------------------------
+  # Current dimmer level as a sensor for graphing/history.
+  # --------------------------------------------------------------------------
+  - platform: template
+    name: "Regulator Opening"
+    id: regulator_opening_sensor
+    icon: mdi:knob
+    lambda: return id(regulator_opening).state;
+    unit_of_measurement: "%"
+    accuracy_decimals: 8
+    update_interval: 1s

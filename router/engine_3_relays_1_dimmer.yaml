@@ -1,0 +1,32 @@
+# ============================================================================
+# Grouter - Engine: 3 Relays + 1 Dimmer
+# ============================================================================
+# Complete solar router configuration for controlling a multi-resistor load
+# (e.g., 3x 800W water heater = 2400W total).
+#
+# This engine provides:
+#   - Stepped power control via relays (0%, 33%, 66%, 100%)
+#   - Fine control via high-performance TRIAC dimmer between steps
+#   - Anti-cycling protection for relays
+#   - Automatic regulation based on grid power
+#
+# Include this file to get all core functionality.
+# ============================================================================
+
+# High-performance TRIAC components (based on MycilaDimmer optimizations)
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [zero_cross, triac]
+
+# Import all components
+packages:
+  substitutions: !include core/substitutions.yaml
+  globals: !include core/globals.yaml
+  regulation: !include core/regulation.yaml
+  relays: !include hardware/relay_controller.yaml
+  triac: !include hardware/triac_controller.yaml
+  power_meter: !include hardware/power_meter_ha.yaml
+  controls: !include ui/controls.yaml
+  sensors: !include ui/sensors.yaml

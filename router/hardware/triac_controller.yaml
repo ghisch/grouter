@@ -1,0 +1,47 @@
+# ============================================================================
+# Grouter - High-Performance TRIAC Controller
+# ============================================================================
+# Controls power output via AC phase-cut dimming using a triac.
+# Uses custom optimized components based on MycilaDimmer with:
+#   - Event-driven timer (vs 50µs polling)
+#   - 1µs precision (vs 50µs in ac_dimmer)
+#   - IRAM-safe for glitch-free OTA updates
+#   - Pre-computed power LUT for linear power output
+#   - Direct GPIO access for minimal latency
+# ============================================================================
+
+# Zero-cross detection (shared sensor)
+zero_cross:
+  id: zcd
+  pin:
+    number: ${pins.regulator_zero_crossing}
+    mode:
+      input: true
+    inverted: true
+
+# High-performance TRIAC output
+output:
+  - platform: triac
+    id: triac_output
+    gate_pin: ${pins.regulator_gate}
+    zero_cross_id: zcd
+    power_lut: true      # Linear power output for resistive loads
+    power_limit: 100%    # Safety limit (adjust if needed)
+
+# Light component for brightness control (0-100%)
+light:
+  - platform: monochromatic
+    id: dimmer_controller
+    output: triac_output
+    internal: true
+    default_transition_length: 0s
+    gamma_correct: 1.0   # Power LUT already handles linearization
+
+# Script to apply regulation level to triac
+script:
+  - id: regulation_control
+    mode: single
+    then:
+      - light.turn_on:
+          id: dimmer_controller
+          brightness: !lambda return id(regulator_opening).state / 100.0;

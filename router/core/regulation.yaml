@@ -1,0 +1,111 @@
+# ============================================================================
+# Grouter - Energy Regulation Algorithm
+# ============================================================================
+# Core regulation logic that adjusts router level based on grid power.
+# ============================================================================
+
+script:
+  # --------------------------------------------------------------------------
+  # Main Energy Regulation Script
+  # --------------------------------------------------------------------------
+  # Calculates the delta percentage to apply to router level to approach
+  # the target grid exchange. Uses a proportional control algorithm where
+  # steps get smaller as we approach the target (prevents oscillation).
+  #
+  # The reactivity parameter controls how aggressively we adjust:
+  #   - Higher reactivity = faster response, but may overshoot
+  #   - Lower reactivity = smoother response, but slower to reach target
+  # --------------------------------------------------------------------------
+  - id: energy_regulation
+    mode: single
+    then:
+      - lambda: |-
+          // Safety check: disable regulation if power readings are invalid or safety triggered
+          if (isnan(id(real_power).state) || id(safety_limit)) {
+            id(router_level).publish_state(0);
+            const float duration = id(relay_duration).state;
+            id(relay_1_countdown).publish_state(duration);
+            id(relay_2_countdown).publish_state(duration);
+            id(relay_3_countdown).publish_state(duration);
+            return;
+          }
+
+          // Get current states (cache to avoid repeated lookups)
+          const double power = id(real_power).state;
+          const double target = id(target_grid_exchange).state;
+          const double current_level = id(router_level).state;
+          const double duration = id(relay_duration).state;
+
+          // Select reactivity based on direction (can be asymmetric)
+          const double react = (power >= target)
+            ? id(down_reactivity).state
+            : id(reactivity).state;
+
+          // Calculate proportional adjustment
+          // Negative power difference = exporting = increase router level
+          // Positive power difference = importing = decrease router level
+          const double delta = -(power - target) * react / ${regulation.power_divisor};
+
+          // Apply delta and clamp to valid range
+          double new_level = std::max(0.0, std::min(100.0, current_level + delta));
+
+          // Threshold constants (compile-time)
+          constexpr double threshold_1 = ${thresholds.relay_1};
+          constexpr double threshold_2 = ${thresholds.relay_2};
+          constexpr double threshold_3 = ${thresholds.relay_3};
+
+          // Calculate new countdown values in REGULATION CYCLES (not seconds!)
+          // Countdowns decrement by 1 each time this script runs.
+          // Script triggers on: power meter changes OR every ${regulation.interval}s
+          double new_cd1, new_cd2, new_cd3;
+
+          if (new_level >= threshold_3) {
+            // All relays should be ON - count down relay 3
+            new_cd3 = id(relay_3_countdown).state - 1;
+            new_cd2 = 0;
+            new_cd1 = 0;
+          } else if (new_level >= threshold_2) {
+            // Relays 1+2 should be ON - count down relay 2
+            if (id(relay_2_countdown).state > 0) {
+              new_level = threshold_2;  // Hold at threshold until countdown expires
+            }
+            new_cd3 = duration;
+            new_cd2 = id(relay_2_countdown).state - 1;
+            new_cd1 = 0;
+          } else if (new_level >= threshold_1) {
+            // Relay 1 should be ON - count down relay 1
+            if (id(relay_1_countdown).state > 0) {
+              new_level = threshold_1;  // Hold at threshold until countdown expires
+            }
+            new_cd3 = duration;
+            new_cd2 = duration;
+            new_cd1 = id(relay_1_countdown).state - 1;
+          } else {
+            // No relays needed - reset all countdowns
+            new_cd3 = duration;
+            new_cd2 = duration;
+            new_cd1 = duration;
+          }
+
+          // Only publish if values changed (reduces HA traffic)
+          if (id(relay_1_countdown).state != new_cd1) id(relay_1_countdown).publish_state(new_cd1);
+          if (id(relay_2_countdown).state != new_cd2) id(relay_2_countdown).publish_state(new_cd2);
+          if (id(relay_3_countdown).state != new_cd3) id(relay_3_countdown).publish_state(new_cd3);
+          if (current_level != new_level) id(router_level).publish_state(new_level);
+
+# --------------------------------------------------------------------------
+# Regulation Trigger
+# --------------------------------------------------------------------------
+# Primary: Triggered on every power sensor value change (reactive)
+# Fallback: Triggered every X seconds if no value changes occur
+# --------------------------------------------------------------------------
+time:
+  - platform: sntp
+    on_time:
+      - seconds: /${regulation.interval}
+        then:
+          - if:
+              condition:
+                switch.is_on: activate
+              then:
+                - script.execute: energy_regulation

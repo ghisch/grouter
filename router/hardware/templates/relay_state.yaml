@@ -1,0 +1,6 @@
+# Relay state binary sensor template
+# Usage: !include { file: templates/relay_state.yaml, vars: { num: "1" } }
+platform: template
+name: "Relay ${num} State"
+id: relay_${num}_state
+lambda: return id(relay_${num}).state;

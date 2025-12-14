@@ -1,0 +1,19 @@
+# ============================================================================
+# Grouter - Global Variables
+# ============================================================================
+# Runtime state variables shared across components.
+# ============================================================================
+
+globals:
+  # Safety limit flag - set to true to immediately stop all regulation
+  # Can be controlled by temperature sensors or other safety mechanisms
+  - id: safety_limit
+    type: bool
+    initial_value: "false"
+
+  # Power meter activation state
+  # Tracks whether the solar routing is actively measuring power
+  - id: power_meter_activated
+    type: bool
+    initial_value: ${power_meter.activated_at_start}
+    restore_value: true

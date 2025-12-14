@@ -1,0 +1,20 @@
+# ============================================================================
+# Grouter - Common Utilities
+# ============================================================================
+# Basic utilities included in all configurations.
+# ============================================================================
+
+button:
+  # Restart button for quick reboot from Home Assistant
+  - platform: restart
+    name: "Restart"
+    icon: mdi:restart
+    entity_category: config
+
+sensor:
+  # Device uptime
+  - platform: uptime
+    type: seconds
+    name: "Uptime"
+    icon: mdi:clock-outline
+    entity_category: diagnostic

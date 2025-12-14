@@ -1,0 +1,10 @@
+# Relay switch template
+# Usage: !include { file: templates/relay_switch.yaml, vars: { num: "1" } }
+platform: output
+name: "Relay ${num}"
+id: relay_${num}
+output: relay_${num}_gpio
+internal: true
+on_turn_on:
+  - lambda: id(regulator_opening).publish_state(0);
+on_turn_off: []

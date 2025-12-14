@@ -1,0 +1,36 @@
+# ============================================================================
+# Grouter - Network Diagnostics
+# ============================================================================
+# WiFi signal and connection information for monitoring.
+# ============================================================================
+
+sensor:
+  # WiFi signal strength in dBm
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: wifi_signal_db
+    icon: mdi:wifi
+    update_interval: 60s
+    entity_category: diagnostic
+
+  # WiFi signal strength as percentage (0-100%)
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Percent"
+    icon: mdi:wifi
+    filters:
+      - lambda: return std::min(std::max(2.0 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: diagnostic
+
+text_sensor:
+  # Current IP address
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      icon: mdi:ip-network
+
+    # Connected access point BSSID
+    bssid:
+      name: "Connected BSSID"
+      icon: mdi:access-point

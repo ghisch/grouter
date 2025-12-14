@@ -1,0 +1,162 @@
+# Hardware test configuration - SAFE for testing with LEDs
+# Use this to verify timing with an oscilloscope before connecting to mains!
+#
+# Hardware setup for safe testing:
+# - Connect an LED (with resistor) to the gate_pin to visualize firing
+# - Use an oscilloscope on the gate_pin to verify timing
+# - Connect a signal generator to zero_cross pin (square wave, 50/60Hz)
+#
+# Run: esphome compile test_hardware_safe.yaml
+
+esphome:
+  name: triac-hw-test
+  friendly_name: "TRIAC Hardware Test"
+  build_path: /tmp/esphome-triac-hw-test
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source:
+      type: local
+      path: ..
+    components: [zero_cross, triac]
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: "TestNetwork"
+  password: "testpassword"
+  ap:
+    ssid: "TRIAC-Test"
+    password: "testpassword"
+
+# Web server for easy control during testing
+web_server:
+  port: 80
+
+# Zero-Cross Detection
+zero_cross:
+  id: zcd
+  pin: GPIO4
+
+# TRIAC Dimmer Output
+output:
+  - platform: triac
+    id: triac_dimmer
+    gate_pin: GPIO26
+    zero_cross_id: zcd
+    min_power: 0%
+    max_power: 100%
+    power_limit: 100%
+    power_lut: true
+    semi_period: 0  # Auto-detect
+
+# Test light for visual feedback
+light:
+  - platform: monochromatic
+    name: "Test Dimmer"
+    id: test_light
+    output: triac_dimmer
+    gamma_correct: 1.0
+
+# Test buttons for quick power level changes
+button:
+  - platform: template
+    name: "Set 0%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.0
+
+  - platform: template
+    name: "Set 10%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.10
+
+  - platform: template
+    name: "Set 25%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.25
+
+  - platform: template
+    name: "Set 50%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.50
+
+  - platform: template
+    name: "Set 75%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.75
+
+  - platform: template
+    name: "Set 100%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 1.0
+
+  - platform: template
+    name: "Ramp Up Test"
+    on_press:
+      - repeat:
+          count: 10
+          then:
+            - lambda: |-
+                static float level = 0.0;
+                level += 0.1;
+                if (level > 1.0) level = 0.0;
+                id(triac_dimmer).set_level(level);
+                ESP_LOGI("test", "Level: %.0f%%", level * 100);
+            - delay: 1s
+
+  - platform: template
+    name: "Stress Test (Fast Ramp)"
+    on_press:
+      - repeat:
+          count: 100
+          then:
+            - lambda: |-
+                static float level = 0.0;
+                level += 0.05;
+                if (level > 1.0) level = 0.0;
+                id(triac_dimmer).set_level(level);
+            - delay: 50ms
+
+# Number input for fine control
+number:
+  - platform: template
+    name: "Power Level"
+    id: power_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    set_action:
+      - output.set_level:
+          id: triac_dimmer
+          level: !lambda "return x / 100.0;"
+
+# Interval for periodic testing
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          ESP_LOGD("test", "ZCD stable: %s, Semi-period: %u µs, Frequency: %.1f Hz",
+                   id(zcd).is_stable() ? "YES" : "NO",
+                   id(zcd).get_semi_period(),
+                   id(zcd).get_frequency());

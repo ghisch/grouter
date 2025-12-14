@@ -1,0 +1,39 @@
+# ============================================================================
+# Grouter - Home Assistant Power Meter
+# ============================================================================
+# Imports power readings from Home Assistant sensors.
+# Triggers regulation on every value change for responsive control.
+# ============================================================================
+
+sensor:
+  # Grid power exchange sensor
+  # Positive = importing from grid, Negative = exporting to grid
+  - platform: homeassistant
+    id: real_power
+    entity_id: ${sensors.grid_power}
+    name: "Grid Power"
+    device_class: power
+    unit_of_measurement: "W"
+    internal: false
+    filters:
+      # Only trigger on meaningful changes (reduces processing)
+      - delta: 5.0
+    on_value:
+      then:
+        - if:
+            condition:
+              switch.is_on: activate
+            then:
+              - script.execute: energy_regulation
+
+  # Home consumption sensor (used for thermostat detection)
+  - platform: homeassistant
+    id: consumption
+    entity_id: ${sensors.consumption}
+    name: "Home Consumption"
+    device_class: power
+    unit_of_measurement: "W"
+    internal: false
+    filters:
+      # Throttle updates to reduce HA traffic
+      - throttle: 5s

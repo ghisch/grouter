@@ -1,0 +1,24 @@
+# ============================================================================
+# Grouter - 3-Channel Relay Controller
+# ============================================================================
+# Controls 3 relays via GPIO using the output switch platform.
+# No intermediate scripts needed - direct GPIO control.
+# ============================================================================
+
+# GPIO outputs for relay control (directly controlled by switches below)
+output:
+  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "1", pin: "${pins.relay_1}" } }
+  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "2", pin: "${pins.relay_2}" } }
+  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "3", pin: "${pins.relay_3}" } }
+
+# Relay switches - use output platform for direct GPIO control
+switch:
+  - <<: !include { file: templates/relay_switch.yaml, vars: { num: "1" } }
+  - <<: !include { file: templates/relay_switch.yaml, vars: { num: "2" } }
+  - <<: !include { file: templates/relay_switch.yaml, vars: { num: "3" } }
+
+# Binary sensors to expose relay states to Home Assistant
+binary_sensor:
+  - <<: !include { file: templates/relay_state.yaml, vars: { num: "1" } }
+  - <<: !include { file: templates/relay_state.yaml, vars: { num: "2" } }
+  - <<: !include { file: templates/relay_state.yaml, vars: { num: "3" } }

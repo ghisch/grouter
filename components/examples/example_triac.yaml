@@ -1,0 +1,146 @@
+# Example ESPHome configuration for TRIAC dimmer component
+# This demonstrates how to use the high-performance TRIAC dimmer
+
+esphome:
+  name: solar-router-example
+  friendly_name: "Solar Router Example"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Load the external components from local path
+external_components:
+  - source:
+      type: local
+      path: ..
+    components: [zero_cross, triac]
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# -----------------------------------------------------------------------------
+# Zero-Cross Detection
+# -----------------------------------------------------------------------------
+# Configure your zero-cross detection pin
+# Common pins: GPIO4, GPIO5, GPIO13, GPIO14
+zero_cross:
+  id: zcd
+  pin: GPIO4  # Connect to your ZCD circuit output
+
+# -----------------------------------------------------------------------------
+# TRIAC Dimmer Output
+# -----------------------------------------------------------------------------
+output:
+  - platform: triac
+    id: triac_dimmer
+    gate_pin: GPIO26          # Connect to your TRIAC/SSR gate
+    zero_cross_id: zcd        # Reference to zero-cross component
+    # Duty cycle remapping (calibration)
+    min_power: 0%             # Minimum duty cycle (default: 0%)
+    max_power: 100%           # Maximum duty cycle (default: 100%)
+    # Safety limit
+    power_limit: 80%          # Maximum allowed power (default: 100%)
+    # Power lookup table for linear power output
+    power_lut: true           # Use non-linear phase angle (default: true)
+    # Semi-period (0 = auto-detect from zero-cross signal)
+    semi_period: 0            # Manual override in µs (10000 for 50Hz, 8333 for 60Hz)
+
+# -----------------------------------------------------------------------------
+# Example: Light integration
+# -----------------------------------------------------------------------------
+light:
+  - platform: monochromatic
+    name: "Dimmer"
+    id: dimmer_light
+    output: triac_dimmer
+    gamma_correct: 1.0        # Power LUT already handles brightness curve
+    default_transition_length: 0.5s
+
+# -----------------------------------------------------------------------------
+# Example: Number input for direct power control
+# -----------------------------------------------------------------------------
+number:
+  - platform: template
+    name: "Power Level"
+    id: power_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    set_action:
+      - output.set_level:
+          id: triac_dimmer
+          level: !lambda "return x / 100.0;"
+
+# -----------------------------------------------------------------------------
+# Example: Sensors for monitoring
+# -----------------------------------------------------------------------------
+sensor:
+  # WiFi signal strength
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+  # Uptime
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+# -----------------------------------------------------------------------------
+# Example: Buttons for testing
+# -----------------------------------------------------------------------------
+button:
+  - platform: template
+    name: "Set 25%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.25
+
+  - platform: template
+    name: "Set 50%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.50
+
+  - platform: template
+    name: "Set 75%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 0.75
+
+  - platform: template
+    name: "Set 100%"
+    on_press:
+      - output.set_level:
+          id: triac_dimmer
+          level: 1.0
+
+  - platform: template
+    name: "Turn Off"
+    on_press:
+      - output.turn_off: triac_dimmer
+
+  - platform: restart
+    name: "Restart"

@@ -1,0 +1,42 @@
+# ============================================================================
+# Grouter - Forced Run Feature
+# ============================================================================
+# Enables the load at full power on a schedule, regardless of solar production.
+# Useful for ensuring hot water during low-sun periods.
+# ============================================================================
+
+binary_sensor:
+  # Home Assistant sensor to enable/disable forced run
+  # When OFF, forced run schedule is ignored
+  - platform: homeassistant
+    id: force_run_enabled
+    entity_id: ${sensors.force_run}
+    internal: true
+
+time:
+  - platform: sntp
+    on_time:
+      # --------------------------------------------------------------------------
+      # Start Forced Run
+      # --------------------------------------------------------------------------
+      # Disables solar routing and sets router to 100% power.
+      # --------------------------------------------------------------------------
+      - cron: ${forced_run.on_cron}
+        then:
+          - lambda: |-
+              // Only run if enabled (or sensor not available)
+              if (isnan(id(force_run_enabled).state) || id(force_run_enabled).state) {
+                id(activate).publish_state(false);
+                id(router_level).publish_state(100);
+              }
+
+      # --------------------------------------------------------------------------
+      # Stop Forced Run
+      # --------------------------------------------------------------------------
+      # Resets router to 0% and re-enables solar routing.
+      # --------------------------------------------------------------------------
+      - cron: ${forced_run.off_cron}
+        then:
+          - lambda: |-
+              id(router_level).publish_state(0);
+              id(activate).publish_state(true);

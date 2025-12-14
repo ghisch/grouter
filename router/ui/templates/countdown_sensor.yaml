@@ -1,0 +1,20 @@
+# Relay countdown sensor template
+# Usage: !include { file: templates/countdown_sensor.yaml, vars: { num: "1" } }
+#
+# IMPORTANT: Countdown is in REGULATION CYCLES, not seconds!
+# Decrements by 1 each time the energy_regulation script runs.
+# Regulation triggers on:
+#   - Every power meter value change (reactive)
+#   - Every ${regulation.interval} seconds (fallback)
+platform: template
+name: "Relay ${num} Countdown"
+id: relay_${num}_countdown
+icon: mdi:timer-sand
+state_class: measurement
+unit_of_measurement: "cycles"
+accuracy_decimals: 0
+filters:
+  - clamp:
+      min_value: 0
+  # Only send to HA when value changes by at least 1
+  - delta: 1.0

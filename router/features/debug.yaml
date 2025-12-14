@@ -1,0 +1,46 @@
+# ============================================================================
+# Grouter - Debug Sensors
+# ============================================================================
+# Development and troubleshooting sensors.
+# Include only when debugging issues.
+# ============================================================================
+
+debug:
+  update_interval: 5s
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+      icon: mdi:information
+      entity_category: diagnostic
+    reset_reason:
+      name: "Reset Reason"
+      icon: mdi:restart-alert
+      entity_category: diagnostic
+
+sensor:
+  # ESP32 internal temperature
+  - platform: internal_temperature
+    name: "Internal Temperature"
+    icon: mdi:thermometer
+    update_interval: 60s
+    entity_category: diagnostic
+
+  # Memory diagnostics
+  - platform: debug
+    free:
+      name: "Heap Free"
+      icon: mdi:memory
+      entity_category: diagnostic
+    block:
+      name: "Heap Max Block"
+      icon: mdi:memory
+      entity_category: diagnostic
+    loop_time:
+      name: "Loop Time"
+      icon: mdi:timer
+      entity_category: diagnostic
+
+logger:
+  level: DEBUG

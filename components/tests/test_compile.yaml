@@ -1,0 +1,47 @@
+# Minimal test configuration for TRIAC component compilation
+# Run: esphome compile test_compile.yaml
+
+esphome:
+  name: triac-test
+  friendly_name: "TRIAC Test"
+  build_path: /tmp/esphome-triac-test
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Load the external components (path relative to this file's location)
+external_components:
+  - source:
+      type: local
+      path: ..
+    components: [zero_cross, triac]
+
+# Disable network features for simple compilation test
+logger:
+  level: DEBUG
+
+# Zero-Cross Detection
+zero_cross:
+  id: zcd
+  pin: GPIO4
+
+# TRIAC Dimmer Output
+output:
+  - platform: triac
+    id: triac_dimmer
+    gate_pin: GPIO26
+    zero_cross_id: zcd
+    min_power: 0%
+    max_power: 100%
+    power_limit: 80%
+    power_lut: true
+    semi_period: 0
+
+# Simple test light
+light:
+  - platform: monochromatic
+    name: "Test Dimmer"
+    output: triac_dimmer
+    gamma_correct: 1.0
