@@ -110,16 +110,17 @@ script:
             id(last_thermostat_state) = thermostat_off;
           }
 
+# Time source for total_daily_energy (resets at midnight)
 time:
   - platform: homeassistant
     id: ha_time
-  - platform: sntp
-    on_time:
-      # Update energy counter every 5 seconds (was 1s - reduces CPU load by 80%)
-      - seconds: /5
-        then:
-          - if:
-              condition:
-                switch.is_on: activate
-              then:
-                - script.execute: energy_diverted_counter
+
+# Update energy counter every 5 seconds
+interval:
+  - interval: 5s
+    then:
+      - if:
+          condition:
+            switch.is_on: activate
+          then:
+            - script.execute: energy_diverted_counter

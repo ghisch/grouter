@@ -94,18 +94,16 @@ script:
           if (current_level != new_level) id(router_level).publish_state(new_level);
 
 # --------------------------------------------------------------------------
-# Regulation Trigger
+# Regulation Trigger (Fallback)
 # --------------------------------------------------------------------------
-# Primary: Triggered on every power sensor value change (reactive)
+# Primary: Triggered on every power sensor value change (in power_meter_ha.yaml)
 # Fallback: Triggered every X seconds if no value changes occur
 # --------------------------------------------------------------------------
-time:
-  - platform: sntp
-    on_time:
-      - seconds: /${regulation_interval}
-        then:
-          - if:
-              condition:
-                switch.is_on: activate
-              then:
-                - script.execute: energy_regulation
+interval:
+  - interval: ${regulation_interval}s
+    then:
+      - if:
+          condition:
+            switch.is_on: activate
+          then:
+            - script.execute: energy_regulation
