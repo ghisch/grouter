@@ -13,19 +13,22 @@ namespace zero_cross {
 
 static const char *const TAG = "zero_cross";
 
+// Static spinlock initialization
+portMUX_TYPE ZeroCrossComponent::spinlock_ = portMUX_INITIALIZER_UNLOCKED;
+
 void ZeroCrossComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Zero-Cross Detection...");
 
   this->pin_->setup();
   this->pin_num_ = static_cast<gpio_num_t>(this->pin_->get_pin());
 
-  // Configure GPIO for interrupt
+  // Configure GPIO for interrupt with pull-up to avoid floating
   gpio_config_t io_conf = {};
   io_conf.intr_type = GPIO_INTR_NEGEDGE;  // Trigger on falling edge
   io_conf.mode = GPIO_MODE_INPUT;
   io_conf.pin_bit_mask = (1ULL << this->pin_num_);
   io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_up_en = GPIO_PULLUP_ENABLE;  // Enable pull-up to avoid floating
 
   esp_err_t err = gpio_config(&io_conf);
   if (err != ESP_OK) {
@@ -67,7 +70,18 @@ void ZeroCrossComponent::dump_config() {
 }
 
 void ZeroCrossComponent::register_callback(ZeroCrossCallback callback) {
-  this->callbacks_.push_back(std::move(callback));
+  // Disable interrupts while modifying callback array
+  portENTER_CRITICAL(&spinlock_);
+
+  if (this->callback_count_ < MAX_CALLBACKS) {
+    this->callbacks_[this->callback_count_] = std::move(callback);
+    this->callback_count_++;
+    ESP_LOGD(TAG, "Registered callback %d", this->callback_count_);
+  } else {
+    ESP_LOGE(TAG, "Max callbacks reached (%d)", MAX_CALLBACKS);
+  }
+
+  portEXIT_CRITICAL(&spinlock_);
 }
 
 float ZeroCrossComponent::get_frequency() const {
@@ -95,8 +109,10 @@ void IRAM_ATTR ZeroCrossComponent::gpio_isr(void *arg) {
       }
     }
 
-    // Call registered callbacks with delay until actual zero crossing
-    self->call_callbacks(self->delay_until_zero_);
+    // Only call callbacks when stable to avoid issues during startup
+    if (self->stable_) {
+      self->call_callbacks(self->delay_until_zero_);
+    }
   } else {
     // Invalid timing - might be noise or second edge in same pulse
     // Don't reset stability immediately, allow some tolerance
@@ -107,8 +123,16 @@ void IRAM_ATTR ZeroCrossComponent::gpio_isr(void *arg) {
 }
 
 void IRAM_ATTR ZeroCrossComponent::call_callbacks(int16_t delay) {
-  for (auto &callback : this->callbacks_) {
-    callback(delay);
+  // Read callback count with spinlock (quick read)
+  portENTER_CRITICAL_ISR(&spinlock_);
+  size_t count = this->callback_count_;
+  portEXIT_CRITICAL_ISR(&spinlock_);
+
+  // Call callbacks without holding lock (callbacks might take time)
+  for (size_t i = 0; i < count; i++) {
+    if (this->callbacks_[i]) {
+      this->callbacks_[i](delay);
+    }
   }
 }
 

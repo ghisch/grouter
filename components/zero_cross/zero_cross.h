@@ -8,13 +8,15 @@
 
 #include <driver/gpio.h>
 #include <functional>
-#include <vector>
 
 namespace esphome {
 namespace zero_cross {
 
 // Callback type: receives delay until actual zero (in microseconds)
 using ZeroCrossCallback = std::function<void(int16_t delay_until_zero)>;
+
+// Maximum number of callbacks (typically just 1 triac dimmer)
+static constexpr size_t MAX_CALLBACKS = 4;
 
 class ZeroCrossComponent : public Component {
  public:
@@ -26,6 +28,7 @@ class ZeroCrossComponent : public Component {
   void set_pin(InternalGPIOPin *pin) { this->pin_ = pin; }
 
   /// Register a callback to be called on each zero-cross event
+  /// Thread-safe: disables interrupts during registration
   void register_callback(ZeroCrossCallback callback);
 
   /// Get the measured semi-period in microseconds (half of AC cycle)
@@ -51,8 +54,12 @@ class ZeroCrossComponent : public Component {
   uint32_t stable_count_{0};
   static constexpr uint32_t STABLE_THRESHOLD = 10;  // Need 10 consistent readings
 
-  // Registered callbacks
-  std::vector<ZeroCrossCallback> callbacks_;
+  // Registered callbacks - fixed size array for ISR safety
+  ZeroCrossCallback callbacks_[MAX_CALLBACKS];
+  volatile size_t callback_count_{0};
+
+  // Spinlock for thread safety
+  static portMUX_TYPE spinlock_;
 
   // Estimated delay from edge detection to actual zero crossing
   // Depends on ZCD circuit - typical values:
