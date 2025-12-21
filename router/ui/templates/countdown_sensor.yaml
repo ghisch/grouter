@@ -5,7 +5,7 @@
 # Decrements by 1 each time the energy_regulation script runs.
 # Regulation triggers on:
 #   - Every power meter value change (reactive)
-#   - Every ${regulation.interval} seconds (fallback)
+#   - Every ${regulation_interval} seconds (fallback)
 platform: template
 name: "Relay ${num} Countdown"
 id: relay_${num}_countdown

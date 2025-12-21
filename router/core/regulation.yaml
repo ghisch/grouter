@@ -44,19 +44,19 @@ script:
           // Calculate proportional adjustment
           // Negative power difference = exporting = increase router level
           // Positive power difference = importing = decrease router level
-          const double delta = -(power - target) * react / ${regulation.power_divisor};
+          const double delta = -(power - target) * react / ${regulation_power_divisor};
 
           // Apply delta and clamp to valid range
           double new_level = std::max(0.0, std::min(100.0, current_level + delta));
 
           // Threshold constants (compile-time)
-          constexpr double threshold_1 = ${thresholds.relay_1};
-          constexpr double threshold_2 = ${thresholds.relay_2};
-          constexpr double threshold_3 = ${thresholds.relay_3};
+          constexpr double threshold_1 = ${thresholds_relay_1};
+          constexpr double threshold_2 = ${thresholds_relay_2};
+          constexpr double threshold_3 = ${thresholds_relay_3};
 
           // Calculate new countdown values in REGULATION CYCLES (not seconds!)
           // Countdowns decrement by 1 each time this script runs.
-          // Script triggers on: power meter changes OR every ${regulation.interval}s
+          // Script triggers on: power meter changes OR every ${regulation_interval}s
           double new_cd1, new_cd2, new_cd3;
 
           if (new_level >= threshold_3) {
@@ -102,7 +102,7 @@ script:
 time:
   - platform: sntp
     on_time:
-      - seconds: /${regulation.interval}
+      - seconds: /${regulation_interval}
         then:
           - if:
               condition:

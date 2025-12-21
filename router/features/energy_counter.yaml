@@ -20,7 +20,7 @@ number:
     max_value: 99999
     step: 1
     unit_of_measurement: "W"
-    initial_value: ${energy.default_load_power}
+    initial_value: ${energy_default_load_power}
     restore_value: true
     optimistic: true
 

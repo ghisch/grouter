@@ -61,9 +61,9 @@ number:
       then:
         - lambda: |-
             const double level = id(router_level).state;
-            const double t1 = ${thresholds.relay_1};
-            const double t2 = ${thresholds.relay_2};
-            const double t3 = ${thresholds.relay_3};
+            const double t1 = ${thresholds_relay_1};
+            const double t2 = ${thresholds_relay_2};
+            const double t3 = ${thresholds_relay_3};
 
             if (level >= t3) {
               // 100%: All relays ON
@@ -132,7 +132,7 @@ number:
   # disabled. Prevents rapid on/off cycling that could damage relays.
   #
   # NOTE: This is NOT in seconds! One cycle = one regulation trigger, which
-  # occurs on every power meter update OR every ${regulation.interval} seconds.
+  # occurs on every power meter update OR every ${regulation_interval} seconds.
   # --------------------------------------------------------------------------
   - platform: template
     name: "Relay Duration"
@@ -141,7 +141,7 @@ number:
     min_value: 0
     max_value: 3600
     step: 1
-    initial_value: ${relay.anti_cycle_duration}
+    initial_value: ${relay_anti_cycle_duration}
     restore_value: true
     unit_of_measurement: "cycles"
     optimistic: true

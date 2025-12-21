@@ -14,7 +14,7 @@
 zero_cross:
   id: zcd
   pin:
-    number: ${pins.regulator_zero_crossing}
+    number: ${pins_regulator_zero_crossing}
     mode:
       input: true
     inverted: true
@@ -23,7 +23,7 @@ zero_cross:
 output:
   - platform: triac
     id: triac_output
-    gate_pin: ${pins.regulator_gate}
+    gate_pin: ${pins_regulator_gate}
     zero_cross_id: zcd
     power_lut: true      # Linear power output for resistive loads
     power_limit: 100%    # Safety limit (adjust if needed)

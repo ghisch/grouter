@@ -37,7 +37,7 @@ This router is designed for loads with **3 identical heating elements**. While t
 - 3× 1000W = 3000W ✅
 - 3× 1500W = 4500W ✅
 
-Simply adjust the `regulation.power_divisor` and `energy.default_load_power` variables to match your total load wattage.
+Simply adjust the `regulation_power_divisor` and `energy_default_load_power` variables to match your total load wattage.
 
 > ⚠️ **Heatsink Warning**: Even though this project's hybrid approach reduces TRIAC heat by offloading base load to relays, **always properly size your heatsink**. The TRIAC still handles fine-tuning power and can get hot under sustained use. Overheating can cause component failure or fire hazards.
 
@@ -110,86 +110,129 @@ router/
 
 ## Configuration
 
-### Quick Start (All-in-One)
-
 ```yaml
-esphome:
-  name: grouter
-  friendly_name: Solar Router
-
-esp32:
-  board: esp32-s3-devkitc-1
-
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-
-api:
-  encryption:
-    key: !secret api_key
-
-ota:
-  - platform: esphome
-    password: !secret ota_password
-
 packages:
+  # ==========================================================================
+  # CORE ENGINE (Required)
+  # ==========================================================================
+  # The main solar router engine with relay + dimmer control.
+  # Includes: regulation algorithm, relay controller, triac dimmer, power meter, UI.
   engine:
-    url: https://github.com/ghisch/grouter/
+    url: https://github.com/ghisch/grouter
+    ref: refactor/complete-restructure
     files:
       - path: router/engine_3_relays_1_dimmer.yaml
         vars:
-          # Hardware pins
-          pins.regulator_gate: "GPIO42"
-          pins.regulator_zero_crossing: "GPIO41"
-          pins.relay_1: "GPIO40"
-          pins.relay_2: "GPIO39"
-          pins.relay_3: "GPIO38"
-          # Home Assistant sensors
-          sensors.grid_power: "sensor.grid_power"
-          sensors.consumption: "sensor.home_consumption"
-          # Load configuration (adjust to your setup!)
-          regulation.power_divisor: "2400"  # Total load wattage
-    refresh: 1d
+          # ------------------------------------------------------------------------
+          # Hardware Pins
+          # ------------------------------------------------------------------------
+          pins_regulator_gate: "GPIO42"              # Triac gate control pin
+          pins_regulator_zero_crossing: "GPIO41"    # Zero-crossing detector input
+          pins_relay_1: "GPIO40"                     # First relay GPIO (active LOW)
+          pins_relay_2: "GPIO39"                     # Second relay GPIO (active LOW)
+          pins_relay_3: "GPIO38"                     # Third relay GPIO (active LOW)
 
-  # Optional features
+          # ------------------------------------------------------------------------
+          # Home Assistant Sensors
+          # ------------------------------------------------------------------------
+          sensors_grid_power: "sensor.grid_power"           # Grid power (+ = import, - = export)
+          sensors_consumption: "sensor.home_consumption"    # Total home consumption
+
+          # ------------------------------------------------------------------------
+          # Relay Thresholds (percentage)
+          # ------------------------------------------------------------------------
+          # For 3 identical resistors: 0-33% dimmer only, 33-66% R1+dimmer, etc.
+          thresholds_relay_1: "33.33333333"          # Router level % to activate relay 1
+          thresholds_relay_2: "66.66666666"          # Router level % to activate relay 2
+          thresholds_relay_3: "100.0"                # Router level % to activate relay 3
+
+          # ------------------------------------------------------------------------
+          # Regulation Parameters
+          # ------------------------------------------------------------------------
+          regulation_power_divisor: "3000"           # Total load wattage (for delta calculation)
+          regulation_interval: "10"                  # Fallback regulation interval (seconds)
+
+          # ------------------------------------------------------------------------
+          # Relay Protection
+          # ------------------------------------------------------------------------
+          # NOTE: This is in regulation cycles, NOT seconds!
+          # One cycle = one power meter update OR one interval tick.
+          relay_anti_cycle_duration: "30"            # Cycles before relay can re-enable
+
+          # ------------------------------------------------------------------------
+          # Power Meter
+          # ------------------------------------------------------------------------
+          power_meter_activated_at_start: "false"    # Start with regulation activated
+    refresh: 0d
+
+  # ==========================================================================
+  # COMMON UTILITIES (Recommended)
+  # ==========================================================================
+  # Adds restart button and uptime sensor.
+  # Recommended: Always include for basic device management.
   common:
-    url: https://github.com/ghisch/grouter/
+    url: https://github.com/ghisch/grouter
+    ref: refactor/complete-restructure
     file: router/features/common.yaml
-    refresh: 1d
+    refresh: 0d
 
+  # ==========================================================================
+  # ENERGY COUNTER (Recommended)
+  # ==========================================================================
+  # Tracks diverted energy for Home Assistant Energy Dashboard.
+  # Recommended: Include if you want energy statistics and thermostat detection.
   energy:
-    url: https://github.com/ghisch/grouter/
+    url: https://github.com/ghisch/grouter
+    ref: refactor/complete-restructure
     files:
       - path: router/features/energy_counter.yaml
         vars:
-          energy.default_load_power: "2400"  # Total load wattage
-    refresh: 1d
+          energy_default_load_power: "2400"          # Total load wattage for energy calculation
+    refresh: 0d
 
+  # ==========================================================================
+  # NETWORK DIAGNOSTICS (Recommended)
+  # ==========================================================================
+  # WiFi signal strength and connection info.
+  # Recommended: Include for monitoring device connectivity.
   network:
-    url: https://github.com/ghisch/grouter/
+    url: https://github.com/ghisch/grouter
+    ref: refactor/complete-restructure
     file: router/features/network.yaml
-    refresh: 1d
+    refresh: 0d
 
-  # Optional: Debug sensors (for troubleshooting)
+  # ==========================================================================
+  # FORCED RUN SCHEDULE (Optional)
+  # ==========================================================================
+  # Enables full power heating on a schedule, regardless of solar production.
+  # Optional: Include if you need guaranteed hot water during low-sun periods.
+  forced_run:
+    url: https://github.com/ghisch/grouter
+    ref: refactor/complete-restructure
+    files:
+      - path: router/features/forced_run.yaml
+        vars:
+          sensors_force_run: "binary_sensor.force_run"   # HA entity to enable/disable forced run
+          forced_run_on_cron: "0 0 2 * * *"              # Cron to start (default: 2 AM)
+          forced_run_off_cron: "0 0 6 * * *"             # Cron to stop (default: 6 AM)
+    refresh: 0d
+
+  # ==========================================================================
+  # DEBUG SENSORS (Development Only)
+  # ==========================================================================
+  # Exposes diagnostic sensors: heap, loop time, temperature, reset reason.
+  # Development only: Include when troubleshooting. Remove in production!
+  # ⚠️ Sets logger to DEBUG level - increases serial output and CPU usage.
   # debug:
-  #   url: https://github.com/ghisch/grouter/
+  #   url: https://github.com/ghisch/grouter
+  #   ref: refactor/complete-restructure
   #   file: router/features/debug.yaml
-  #   refresh: 1d
+  #   refresh: 0d
 ```
 
-### Debug Mode
+### Debug Mode Details
 
-For troubleshooting, include the debug package to expose diagnostic sensors:
-
-```yaml
-packages:
-  debug:
-    url: https://github.com/ghisch/grouter/
-    file: router/features/debug.yaml
-    refresh: 1d
-```
-
-This adds the following diagnostic entities:
+When enabled, the debug package exposes:
 
 | Sensor | Description |
 |--------|-------------|
@@ -200,142 +243,13 @@ This adds the following diagnostic entities:
 | **Heap Max Block** | Largest contiguous free memory block |
 | **Loop Time** | Main loop execution time (ms) |
 
-⚠️ Debug mode sets logger level to `DEBUG`, which increases serial output and may slightly impact performance. **Remove in production.**
-
-### Modular Configuration
-
-For more control, include individual components:
-
-```yaml
-packages:
-  # Core (required)
-  substitutions:
-    url: https://github.com/ghisch/grouter/
-    file: router/core/substitutions.yaml
-    refresh: 1d
-
-  globals:
-    url: https://github.com/ghisch/grouter/
-    file: router/core/globals.yaml
-    refresh: 1d
-
-  regulation:
-    url: https://github.com/ghisch/grouter/
-    file: router/core/regulation.yaml
-    refresh: 1d
-
-  # Hardware (pick what you need)
-  relays:
-    url: https://github.com/ghisch/grouter/
-    files:
-      - path: router/hardware/relay_controller.yaml
-        vars:
-          pins.relay_1: "GPIO40"
-          pins.relay_2: "GPIO39"
-          pins.relay_3: "GPIO38"
-    refresh: 1d
-
-  triac:
-    url: https://github.com/ghisch/grouter/
-    files:
-      - path: router/hardware/triac_controller.yaml
-        vars:
-          pins.regulator_gate: "GPIO42"
-          pins.regulator_zero_crossing: "GPIO41"
-    refresh: 1d
-
-  power_meter:
-    url: https://github.com/ghisch/grouter/
-    files:
-      - path: router/hardware/power_meter_ha.yaml
-        vars:
-          sensors.grid_power: "sensor.grid_power"
-          sensors.consumption: "sensor.home_consumption"
-    refresh: 1d
-
-  # UI (required)
-  controls:
-    url: https://github.com/ghisch/grouter/
-    file: router/ui/controls.yaml
-    refresh: 1d
-
-  sensors:
-    url: https://github.com/ghisch/grouter/
-    file: router/ui/sensors.yaml
-    refresh: 1d
-```
-
-## Configurable Variables
-
-All variables are defined in `core/substitutions.yaml` with sensible defaults. Override them via `vars` in your package includes.
-
-### Hardware Pins (`pins.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `pins.regulator_gate` | `GPIO42` | Triac gate control pin |
-| `pins.regulator_zero_crossing` | `GPIO41` | Zero-crossing detector input |
-| `pins.relay_1` | `GPIO40` | First relay GPIO (active LOW) |
-| `pins.relay_2` | `GPIO39` | Second relay GPIO (active LOW) |
-| `pins.relay_3` | `GPIO38` | Third relay GPIO (active LOW) |
-
-### Home Assistant Sensors (`sensors.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `sensors.grid_power` | `sensor.grid_power` | Grid power exchange entity (+ = import, - = export) |
-| `sensors.consumption` | `sensor.home_consumption` | Total home consumption entity |
-| `sensors.force_run` | `binary_sensor.force_run` | Forced run enable/disable entity |
-
-### Relay Thresholds (`thresholds.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `thresholds.relay_1` | `33.33333333` | Router level % to activate relay 1 |
-| `thresholds.relay_2` | `66.66666666` | Router level % to activate relay 2 |
-| `thresholds.relay_3` | `100.0` | Router level % to activate relay 3 |
-
-### Regulation Parameters (`regulation.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `regulation.power_divisor` | `3000` | Total load wattage (for delta calculation) |
-| `regulation.interval` | `10` | Fallback regulation interval in seconds |
-
-### Relay Protection (`relay.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `relay.anti_cycle_duration` | `30` | Regulation cycles before relay can re-enable* |
-
-> **\*Note on Regulation Cycles:** The countdown is NOT in seconds! One cycle = one regulation script execution. The script runs on **every power meter value change** (reactive) OR **every `regulation.interval` seconds** (fallback). With frequent power updates, 30 cycles might complete in 30-300 seconds depending on power meter activity.
-
-### Forced Run Schedule (`forced_run.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `forced_run.on_cron` | `0 0 2 * * *` | Cron to start forced run (default: 2 AM) |
-| `forced_run.off_cron` | `0 0 6 * * *` | Cron to stop forced run (default: 6 AM) |
-
-### Energy Counter (`energy.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `energy.default_load_power` | `2400` | Total load wattage for energy calculation |
-
-### Power Meter (`power_meter.*`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `power_meter.activated_at_start` | `false` | Start with power meter activated |
-
 ## Adapting to Your Load
 
 ### For Different Power Ratings
 
 If your water heater has different resistor values, update these variables:
 
-| Your Setup | `regulation.power_divisor` | `energy.default_load_power` |
+| Your Setup | `regulation_power_divisor` | `energy_default_load_power` |
 |------------|---------------------------|----------------------------|
 | 3× 500W = 1500W | `1500` | `1500` |
 | 3× 800W = 2400W | `2400` | `2400` |

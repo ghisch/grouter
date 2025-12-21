@@ -10,7 +10,7 @@ binary_sensor:
   # When OFF, forced run schedule is ignored
   - platform: homeassistant
     id: force_run_enabled
-    entity_id: ${sensors.force_run}
+    entity_id: ${sensors_force_run}
     internal: true
 
 time:
@@ -21,7 +21,7 @@ time:
       # --------------------------------------------------------------------------
       # Disables solar routing and sets router to 100% power.
       # --------------------------------------------------------------------------
-      - cron: ${forced_run.on_cron}
+      - cron: ${forced_run_on_cron}
         then:
           - lambda: |-
               // Only run if enabled (or sensor not available)
@@ -35,7 +35,7 @@ time:
       # --------------------------------------------------------------------------
       # Resets router to 0% and re-enables solar routing.
       # --------------------------------------------------------------------------
-      - cron: ${forced_run.off_cron}
+      - cron: ${forced_run_off_cron}
         then:
           - lambda: |-
               id(router_level).publish_state(0);

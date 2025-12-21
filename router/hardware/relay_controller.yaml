@@ -7,9 +7,9 @@
 
 # GPIO outputs for relay control (directly controlled by switches below)
 output:
-  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "1", pin: "${pins.relay_1}" } }
-  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "2", pin: "${pins.relay_2}" } }
-  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "3", pin: "${pins.relay_3}" } }
+  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "1", pin: "${pins_relay_1}" } }
+  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "2", pin: "${pins_relay_2}" } }
+  - <<: !include { file: templates/relay_gpio.yaml, vars: { num: "3", pin: "${pins_relay_3}" } }
 
 # Relay switches - use output platform for direct GPIO control
 switch:

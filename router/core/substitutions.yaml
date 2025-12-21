@@ -3,31 +3,32 @@
 # ============================================================================
 # All configurable values and magic numbers are defined here.
 # Override these via package vars in your device configuration.
+#
+# NOTE: ESPHome substitutions cannot contain dots in names.
+# Use underscores: pins_relay_1 (not pins.relay_1)
 # ============================================================================
 
 substitutions:
   # --------------------------------------------------------------------------
   # Hardware Pin Configuration
   # --------------------------------------------------------------------------
-  pins:
-    # AC Dimmer / Triac
-    regulator_gate: "GPIO42"
-    regulator_zero_crossing: "GPIO41"
-    # Relays (active LOW)
-    relay_1: "GPIO40"
-    relay_2: "GPIO39"
-    relay_3: "GPIO38"
+  # AC Dimmer / Triac
+  pins_regulator_gate: "GPIO42"
+  pins_regulator_zero_crossing: "GPIO41"
+  # Relays (active LOW)
+  pins_relay_1: "GPIO40"
+  pins_relay_2: "GPIO39"
+  pins_relay_3: "GPIO38"
 
   # --------------------------------------------------------------------------
   # Home Assistant Sensors
   # --------------------------------------------------------------------------
-  sensors:
-    # Grid power exchange (positive = importing, negative = exporting)
-    grid_power: "sensor.grid_power"
-    # Total home consumption
-    consumption: "sensor.home_consumption"
-    # Forced run control sensor
-    force_run: "binary_sensor.force_run"
+  # Grid power exchange (positive = importing, negative = exporting)
+  sensors_grid_power: "sensor.grid_power"
+  # Total home consumption
+  sensors_consumption: "sensor.home_consumption"
+  # Forced run control sensor
+  sensors_force_run: "binary_sensor.force_run"
 
   # --------------------------------------------------------------------------
   # Relay Thresholds (percentage)
@@ -37,19 +38,17 @@ substitutions:
   #   33.33-66.66%: Relay 1 ON + Dimmer (800-1600W)
   #   66.66-100% : Relay 1+2 ON + Dimmer (1600-2400W)
   #   100%       : All relays ON, dimmer bypassed
-  thresholds:
-    relay_1: "33.33333333"
-    relay_2: "66.66666666"
-    relay_3: "100.0"
+  thresholds_relay_1: "33.33333333"
+  thresholds_relay_2: "66.66666666"
+  thresholds_relay_3: "100.0"
 
   # --------------------------------------------------------------------------
   # Regulation Parameters
   # --------------------------------------------------------------------------
-  regulation:
-    # Total load power in watts (used for delta calculation)
-    power_divisor: "3000"
-    # Fallback regulation interval in seconds (primary is on_value trigger)
-    interval: "10"
+  # Total load power in watts (used for delta calculation)
+  regulation_power_divisor: "3000"
+  # Fallback regulation interval in seconds (primary is on_value trigger)
+  regulation_interval: "10"
 
   # --------------------------------------------------------------------------
   # Relay Anti-Cycling Protection (in regulation cycles)
@@ -59,29 +58,25 @@ substitutions:
   #
   # NOTE: This is NOT in seconds! One regulation cycle occurs when:
   #   - Power meter value changes (reactive trigger)
-  #   - OR every ${regulation.interval} seconds (fallback trigger)
+  #   - OR every ${regulation_interval} seconds (fallback trigger)
   #
   # Example: With interval=10s and frequent power updates, 30 cycles
   # might complete in 30-300 seconds depending on power meter activity.
-  relay:
-    anti_cycle_duration: "30"
+  relay_anti_cycle_duration: "30"
 
   # --------------------------------------------------------------------------
   # Forced Run Schedule (Cron format)
   # --------------------------------------------------------------------------
   # Format: "seconds minutes hours day_of_month month day_of_week"
-  forced_run:
-    on_cron: "0 0 2 * * *"   # 02:00 AM - Start forced heating
-    off_cron: "0 0 6 * * *"  # 06:00 AM - Stop forced heating
+  forced_run_on_cron: "0 0 2 * * *"   # 02:00 AM - Start forced heating
+  forced_run_off_cron: "0 0 6 * * *"  # 06:00 AM - Stop forced heating
 
   # --------------------------------------------------------------------------
   # Energy Counter
   # --------------------------------------------------------------------------
-  energy:
-    default_load_power: "2400"
+  energy_default_load_power: "2400"
 
   # --------------------------------------------------------------------------
   # Power Meter
   # --------------------------------------------------------------------------
-  power_meter:
-    activated_at_start: "false"
+  power_meter_activated_at_start: "false"

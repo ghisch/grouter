@@ -10,7 +10,7 @@ sensor:
   # Positive = importing from grid, Negative = exporting to grid
   - platform: homeassistant
     id: real_power
-    entity_id: ${sensors.grid_power}
+    entity_id: ${sensors_grid_power}
     name: "Grid Power"
     device_class: power
     unit_of_measurement: "W"
@@ -29,7 +29,7 @@ sensor:
   # Home consumption sensor (used for thermostat detection)
   - platform: homeassistant
     id: consumption
-    entity_id: ${sensors.consumption}
+    entity_id: ${sensors_consumption}
     name: "Home Consumption"
     device_class: power
     unit_of_measurement: "W"
