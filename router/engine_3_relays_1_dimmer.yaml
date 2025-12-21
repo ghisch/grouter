@@ -16,8 +16,10 @@
 # High-performance TRIAC components (based on MycilaDimmer optimizations)
 external_components:
   - source:
-      type: local
-      path: ../components
+      type: git
+      url: https://github.com/ghisch/grouter
+      ref: refactor/complete-restructure  # TODO: change to main before merging
+      path: components
     components: [zero_cross, triac]
 
 # Import all components
