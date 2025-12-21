@@ -199,8 +199,8 @@ void TriacDimmer::apply_duty_cycle() {
   }
   portEXIT_CRITICAL(&spinlock_);
 
-  ESP_LOGV(TAG, "Duty: %.2f%%, Fire: %.2f%%, Delay: %uµs", this->duty_cycle_ * 100.0f, this->duty_cycle_fire_ * 100.0f,
-           this->firing_delay_);
+  ESP_LOGD(TAG, "Duty: %.1f%% -> Fire: %.1f%% -> Delay: %uµs (semi: %uµs)", this->duty_cycle_ * 100.0f,
+           this->duty_cycle_fire_ * 100.0f, this->firing_delay_, semi_period);
 }
 
 uint16_t TriacDimmer::lookup_firing_delay(float duty_cycle, uint16_t semi_period) {
