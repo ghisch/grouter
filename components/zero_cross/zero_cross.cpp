@@ -31,9 +31,6 @@ void ZeroCrossComponent::setup() {
   io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io_conf.pull_up_en = GPIO_PULLUP_ENABLE;  // Enable pull-up to avoid floating
 
-  ESP_LOGD(TAG, "Pin %d inverted: %s, using %s edge", this->pin_num_, this->pin_->is_inverted() ? "YES" : "NO",
-           this->pin_->is_inverted() ? "POSEDGE" : "NEGEDGE");
-
   esp_err_t err = gpio_config(&io_conf);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to configure GPIO: %s", esp_err_to_name(err));
@@ -65,6 +62,8 @@ void ZeroCrossComponent::loop() {
 void ZeroCrossComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Zero-Cross Detection:");
   LOG_PIN("  Pin: ", this->pin_);
+  ESP_LOGCONFIG(TAG, "  Inverted: %s, Edge: %s", this->pin_->is_inverted() ? "YES" : "NO",
+                this->pin_->is_inverted() ? "POSEDGE" : "NEGEDGE");
   if (this->stable_) {
     ESP_LOGCONFIG(TAG, "  Semi-period: %uµs", this->semi_period_);
     ESP_LOGCONFIG(TAG, "  Frequency: %.1fHz", this->get_frequency());
