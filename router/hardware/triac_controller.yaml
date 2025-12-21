@@ -28,20 +28,12 @@ output:
     power_lut: true      # Linear power output for resistive loads
     power_limit: 100%    # Safety limit (adjust if needed)
 
-# Light component for brightness control (0-100%)
-light:
-  - platform: monochromatic
-    id: dimmer_controller
-    output: triac_output
-    internal: true
-    default_transition_length: 0s
-    gamma_correct: 1.0   # Power LUT already handles linearization
-
 # Script to apply regulation level to triac
+# Uses direct output control (bypasses light component for more precise control)
 script:
   - id: regulation_control
     mode: single
     then:
-      - light.turn_on:
-          id: dimmer_controller
-          brightness: !lambda return id(regulator_opening).state / 100.0;
+      - output.set_level:
+          id: triac_output
+          level: !lambda return id(regulator_opening).state / 100.0;
