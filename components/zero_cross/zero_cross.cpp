@@ -23,12 +23,16 @@ void ZeroCrossComponent::setup() {
   this->pin_num_ = static_cast<gpio_num_t>(this->pin_->get_pin());
 
   // Configure GPIO for interrupt with pull-up to avoid floating
+  // Respect the pin's inversion setting for interrupt edge
   gpio_config_t io_conf = {};
-  io_conf.intr_type = GPIO_INTR_NEGEDGE;  // Trigger on falling edge
+  io_conf.intr_type = this->pin_->is_inverted() ? GPIO_INTR_POSEDGE : GPIO_INTR_NEGEDGE;
   io_conf.mode = GPIO_MODE_INPUT;
   io_conf.pin_bit_mask = (1ULL << this->pin_num_);
   io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io_conf.pull_up_en = GPIO_PULLUP_ENABLE;  // Enable pull-up to avoid floating
+
+  ESP_LOGD(TAG, "Pin %d inverted: %s, using %s edge", this->pin_num_, this->pin_->is_inverted() ? "YES" : "NO",
+           this->pin_->is_inverted() ? "POSEDGE" : "NEGEDGE");
 
   esp_err_t err = gpio_config(&io_conf);
   if (err != ESP_OK) {
