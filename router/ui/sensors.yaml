@@ -18,15 +18,15 @@ sensor:
   - <<: !include { file: templates/countdown_sensor.yaml, vars: { num: "3" } }
 
   # --------------------------------------------------------------------------
-  # Regulator Opening Sensor
+  # Dimmer Level Sensor
   # --------------------------------------------------------------------------
   # Current dimmer level as a sensor for graphing/history.
   # --------------------------------------------------------------------------
   - platform: template
-    name: "Regulator Opening"
-    id: regulator_opening_sensor
+    name: "Dimmer Level"
+    id: dimmer_level_sensor
     icon: mdi:knob
     lambda: return id(regulator_opening).state;
     unit_of_measurement: "%"
-    accuracy_decimals: 8
+    accuracy_decimals: 1
     update_interval: 1s

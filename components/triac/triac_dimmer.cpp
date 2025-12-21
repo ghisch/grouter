@@ -235,21 +235,22 @@ void IRAM_ATTR TriacDimmer::on_zero_cross(int16_t delay_until_zero) {
 
   if (firing_delay == 0) {
     // Full power - turn on immediately and keep on using direct GPIO access
+    // Disable any pending alarm to prevent spurious ISR calls
+    gptimer_set_alarm_action(this->fire_timer_, nullptr);
     gpio_ll_set_level(&GPIO, this->gate_pin_num_, 1);
     return;
   }
 
   if (firing_delay == UINT16_MAX) {
     // Off - turn off and stay off using direct GPIO access
+    // Disable any pending alarm to prevent spurious ISR calls
+    gptimer_set_alarm_action(this->fire_timer_, nullptr);
     gpio_ll_set_level(&GPIO, this->gate_pin_num_, 0);
     return;
   }
 
   // Partial power - turn off now, set alarm to turn on later
   gpio_ll_set_level(&GPIO, this->gate_pin_num_, 0);
-
-  // Reset timer counter to start fresh from this zero-cross
-  gptimer_set_raw_count(this->fire_timer_, 0);
 
   // Enforce minimum delay for reliable triac triggering
   uint16_t actual_delay = firing_delay;
@@ -261,6 +262,9 @@ void IRAM_ATTR TriacDimmer::on_zero_cross(int16_t delay_until_zero) {
   if (delay_until_zero > 0 && actual_delay > static_cast<uint16_t>(delay_until_zero)) {
     actual_delay -= delay_until_zero;
   }
+
+  // Reset timer counter to start fresh from this zero-cross
+  gptimer_set_raw_count(this->fire_timer_, 0);
 
   // Set alarm to fire at the calculated delay
   // Note: alarm_config must be in stack (internal RAM) for ISR safety
