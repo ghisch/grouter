@@ -67,11 +67,11 @@ class ZeroCrossComponent : public Component {
   // - Daniel S ZCD: ~550µs
   int16_t delay_until_zero_{200};  // Default for common ZCD circuits
 
-  /// Static ISR handler
-  static void IRAM_ATTR gpio_isr(void *arg);
+  /// Static ISR handler (IRAM_ATTR in implementation)
+  static void gpio_isr(void *arg);
 
-  /// Call registered callbacks (IRAM safe)
-  void IRAM_ATTR call_callbacks(int16_t delay);
+  /// Call registered callbacks (IRAM_ATTR in implementation)
+  void call_callbacks(int16_t delay);
 };
 
 }  // namespace zero_cross
