@@ -7,6 +7,8 @@
 #include "esphome/core/hal.h"
 
 #include <driver/gpio.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
 #include <functional>
 
 namespace esphome {

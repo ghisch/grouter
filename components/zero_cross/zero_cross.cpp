@@ -74,17 +74,24 @@ void ZeroCrossComponent::dump_config() {
 
 void ZeroCrossComponent::register_callback(ZeroCrossCallback callback) {
   // Disable interrupts while modifying callback array
-  portENTER_CRITICAL(&spinlock_);
+  bool success = false;
+  size_t count = 0;
 
+  portENTER_CRITICAL(&spinlock_);
   if (this->callback_count_ < MAX_CALLBACKS) {
     this->callbacks_[this->callback_count_] = std::move(callback);
     this->callback_count_++;
-    ESP_LOGD(TAG, "Registered callback %d", this->callback_count_);
+    count = this->callback_count_;
+    success = true;
+  }
+  portEXIT_CRITICAL(&spinlock_);
+
+  // Log AFTER exiting critical section (logging requires locks)
+  if (success) {
+    ESP_LOGD(TAG, "Registered callback %zu", count);
   } else {
     ESP_LOGE(TAG, "Max callbacks reached (%d)", MAX_CALLBACKS);
   }
-
-  portEXIT_CRITICAL(&spinlock_);
 }
 
 float ZeroCrossComponent::get_frequency() const {
