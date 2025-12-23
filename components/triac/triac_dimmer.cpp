@@ -137,13 +137,22 @@ void TriacDimmer::dump_config() {
   LOG_FLOAT_OUTPUT(this);
 }
 
+// Static IRAM callback wrapper - avoids std::function which is not IRAM-safe
+void IRAM_ATTR TriacDimmer::zero_cross_callback_wrapper(void *arg, int16_t delay_until_zero) {
+  auto *self = static_cast<TriacDimmer *>(arg);
+  if (self != nullptr) {
+    self->on_zero_cross(delay_until_zero);
+  }
+}
+
 void TriacDimmer::register_with_zero_cross() {
   if (this->zero_cross_ == nullptr) {
     ESP_LOGE(TAG, "Zero-cross component not set!");
     return;
   }
 
-  this->zero_cross_->register_callback([this](int16_t delay_until_zero) { this->on_zero_cross(delay_until_zero); });
+  // Use raw function pointer for IRAM safety (no std::function)
+  this->zero_cross_->register_callback(&TriacDimmer::zero_cross_callback_wrapper, this);
 
   ESP_LOGD(TAG, "Registered with zero-cross component");
 }

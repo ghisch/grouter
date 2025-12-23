@@ -80,8 +80,11 @@ class TriacDimmer : public output::FloatOutput, public Component {
   /// Register this dimmer for zero-cross callbacks
   void register_with_zero_cross();
 
-  /// Zero-cross callback handler
-  void on_zero_cross(int16_t delay_until_zero);
+  /// Static IRAM callback wrapper for zero-cross events
+  static void IRAM_ATTR zero_cross_callback_wrapper(void *arg, int16_t delay_until_zero);
+
+  /// Zero-cross callback handler (called from ISR context)
+  void IRAM_ATTR on_zero_cross(int16_t delay_until_zero);
 
   /// Timer ISR for firing the triac
   static bool IRAM_ATTR fire_timer_isr(gptimer_handle_t timer, const gptimer_alarm_event_data_t *event, void *arg);

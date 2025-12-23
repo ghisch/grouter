@@ -72,14 +72,15 @@ void ZeroCrossComponent::dump_config() {
   }
 }
 
-void ZeroCrossComponent::register_callback(ZeroCrossCallback callback) {
+void ZeroCrossComponent::register_callback(ZeroCrossCallbackFn fn, void *arg) {
   // Disable interrupts while modifying callback array
   bool success = false;
   size_t count = 0;
 
   portENTER_CRITICAL(&spinlock_);
   if (this->callback_count_ < MAX_CALLBACKS) {
-    this->callbacks_[this->callback_count_] = std::move(callback);
+    this->callbacks_[this->callback_count_].fn = fn;
+    this->callbacks_[this->callback_count_].arg = arg;
     this->callback_count_++;
     count = this->callback_count_;
     success = true;
@@ -139,9 +140,10 @@ void IRAM_ATTR ZeroCrossComponent::call_callbacks(int16_t delay) {
   portEXIT_CRITICAL_ISR(&spinlock_);
 
   // Call callbacks without holding lock (callbacks might take time)
+  // Using raw function pointers - no std::function overhead, IRAM safe
   for (size_t i = 0; i < count; i++) {
-    if (this->callbacks_[i]) {
-      this->callbacks_[i](delay);
+    if (this->callbacks_[i].fn != nullptr) {
+      this->callbacks_[i].fn(this->callbacks_[i].arg, delay);
     }
   }
 }

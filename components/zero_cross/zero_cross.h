@@ -9,13 +9,19 @@
 #include <driver/gpio.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/portmacro.h>
-#include <functional>
 
 namespace esphome {
 namespace zero_cross {
 
-// Callback type: receives delay until actual zero (in microseconds)
-using ZeroCrossCallback = std::function<void(int16_t delay_until_zero)>;
+// Raw function pointer callback type for IRAM safety
+// Receives: user_arg, delay_until_zero (in microseconds)
+typedef void (*ZeroCrossCallbackFn)(void *arg, int16_t delay_until_zero);
+
+// Callback entry structure
+struct ZeroCrossCallbackEntry {
+  ZeroCrossCallbackFn fn{nullptr};
+  void *arg{nullptr};
+};
 
 // Maximum number of callbacks (typically just 1 triac dimmer)
 static constexpr size_t MAX_CALLBACKS = 4;
@@ -30,8 +36,9 @@ class ZeroCrossComponent : public Component {
   void set_pin(InternalGPIOPin *pin) { this->pin_ = pin; }
 
   /// Register a callback to be called on each zero-cross event
+  /// Uses raw function pointer for IRAM safety (no std::function)
   /// Thread-safe: disables interrupts during registration
-  void register_callback(ZeroCrossCallback callback);
+  void register_callback(ZeroCrossCallbackFn fn, void *arg);
 
   /// Get the measured semi-period in microseconds (half of AC cycle)
   /// For 50Hz: ~10000µs, for 60Hz: ~8333µs
@@ -57,7 +64,7 @@ class ZeroCrossComponent : public Component {
   static constexpr uint32_t STABLE_THRESHOLD = 10;  // Need 10 consistent readings
 
   // Registered callbacks - fixed size array for ISR safety
-  ZeroCrossCallback callbacks_[MAX_CALLBACKS];
+  ZeroCrossCallbackEntry callbacks_[MAX_CALLBACKS];
   volatile size_t callback_count_{0};
 
   // Spinlock for thread safety
