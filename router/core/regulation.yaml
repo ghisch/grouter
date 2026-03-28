@@ -81,10 +81,25 @@ script:
             new_cd2 = duration;
             new_cd1 = id(relay_1_countdown).state - 1;
           } else {
-            // No relays needed - reset all countdowns
+            // Below all thresholds - reset idle countdowns
             new_cd3 = duration;
             new_cd2 = duration;
             new_cd1 = duration;
+          }
+
+          // Prevent power oscillations from resetting active countdowns.
+          // If a countdown was already counting down (< duration) but the
+          // current branch wants to reset it to duration, keep decrementing
+          // instead. This fixes threshold-crossing oscillation where grid
+          // fluctuations briefly push the level below a threshold.
+          if (new_cd1 >= duration && id(relay_1_countdown).state < duration) {
+            new_cd1 = id(relay_1_countdown).state - 1;
+          }
+          if (new_cd2 >= duration && id(relay_2_countdown).state < duration) {
+            new_cd2 = id(relay_2_countdown).state - 1;
+          }
+          if (new_cd3 >= duration && id(relay_3_countdown).state < duration) {
+            new_cd3 = id(relay_3_countdown).state - 1;
           }
 
           // Only publish if values changed (reduces HA traffic)
