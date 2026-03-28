@@ -38,8 +38,8 @@ substitutions:
   #   33.33-66.66%: Relay 1 ON + Dimmer (800-1600W)
   #   66.66-100% : Relay 1+2 ON + Dimmer (1600-2400W)
   #   100%       : All relays ON, dimmer bypassed
-  thresholds_relay_1: "33.33333333"
-  thresholds_relay_2: "66.66666666"
+  thresholds_relay_1: "33.3"
+  thresholds_relay_2: "66.6"
   thresholds_relay_3: "100.0"
 
   # --------------------------------------------------------------------------
@@ -62,7 +62,7 @@ substitutions:
   #
   # Example: With interval=10s and frequent power updates, 30 cycles
   # might complete in 30-300 seconds depending on power meter activity.
-  relay_anti_cycle_duration: "30"
+  relay_anti_cycle_duration: "10"
 
   # --------------------------------------------------------------------------
   # Forced Run Schedule (Cron format)

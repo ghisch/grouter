@@ -54,6 +54,16 @@ script:
           constexpr double threshold_2 = ${thresholds_relay_2};
           constexpr double threshold_3 = ${thresholds_relay_3};
 
+          // Snap to relay thresholds when close from below.
+          // The proportional controller approaches thresholds asymptotically
+          // (delta shrinks as grid power approaches 0), so without snapping
+          // the level gets stuck just below the threshold and the relay
+          // countdown never starts.
+          constexpr double snap_margin = 1.0;  // snap within 1% of threshold
+          if (new_level > threshold_1 - snap_margin && new_level < threshold_1) new_level = threshold_1;
+          if (new_level > threshold_2 - snap_margin && new_level < threshold_2) new_level = threshold_2;
+          if (new_level > threshold_3 - snap_margin && new_level < threshold_3) new_level = threshold_3;
+
           // Calculate new countdown values in REGULATION CYCLES (not seconds!)
           // Countdowns decrement by 1 each time this script runs.
           // Script triggers on: power meter changes OR every ${regulation_interval}s
@@ -81,25 +91,10 @@ script:
             new_cd2 = duration;
             new_cd1 = id(relay_1_countdown).state - 1;
           } else {
-            // Below all thresholds - reset idle countdowns
+            // No relays needed - reset all countdowns
             new_cd3 = duration;
             new_cd2 = duration;
             new_cd1 = duration;
-          }
-
-          // Prevent power oscillations from resetting active countdowns.
-          // If a countdown was already counting down (< duration) but the
-          // current branch wants to reset it to duration, keep decrementing
-          // instead. This fixes threshold-crossing oscillation where grid
-          // fluctuations briefly push the level below a threshold.
-          if (new_cd1 >= duration && id(relay_1_countdown).state < duration) {
-            new_cd1 = id(relay_1_countdown).state - 1;
-          }
-          if (new_cd2 >= duration && id(relay_2_countdown).state < duration) {
-            new_cd2 = id(relay_2_countdown).state - 1;
-          }
-          if (new_cd3 >= duration && id(relay_3_countdown).state < duration) {
-            new_cd3 = id(relay_3_countdown).state - 1;
           }
 
           // Only publish if values changed (reduces HA traffic)

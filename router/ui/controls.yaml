@@ -186,7 +186,7 @@ number:
     min_value: 1
     max_value: 100
     step: 1
-    initial_value: 0
+    initial_value: 30
     restore_value: true
     optimistic: true
     mode: box
@@ -207,7 +207,7 @@ number:
     min_value: -99999
     max_value: 99999
     step: 1
-    initial_value: 0
+    initial_value: -20
     restore_value: true
     unit_of_measurement: "W"
     optimistic: true
