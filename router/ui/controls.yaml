@@ -21,8 +21,10 @@ switch:
     on_turn_on:
       then:
         - lambda: |-
-            // Initialize relay countdowns
             const float duration = id(relay_duration).state;
+            id(g_cd1) = duration;
+            id(g_cd2) = duration;
+            id(g_cd3) = duration;
             id(relay_1_countdown).publish_state(duration);
             id(relay_2_countdown).publish_state(duration);
             id(relay_3_countdown).publish_state(duration);
@@ -31,7 +33,9 @@ switch:
       then:
         - number.to_min: router_level
         - lambda: |-
-            // Reset all states
+            id(g_cd1) = 0;
+            id(g_cd2) = 0;
+            id(g_cd3) = 0;
             id(relay_1_countdown).publish_state(0);
             id(relay_2_countdown).publish_state(0);
             id(relay_3_countdown).publish_state(0);
@@ -69,7 +73,7 @@ number:
               // 100%: All relays ON
               id(relay_1).turn_on();
               id(relay_2).turn_on();
-              if (id(relay_3_countdown).state <= 0) {
+              if (id(g_cd3) <= 0) {
                 id(relay_3).turn_on();
               } else {
                 id(relay_3).turn_off();
@@ -79,7 +83,7 @@ number:
               // 66-100%: Relay 1+2 ON, dimmer controls remainder
               id(relay_1).turn_on();
               id(relay_3).turn_off();
-              if (id(relay_2_countdown).state <= 0) {
+              if (id(g_cd2) <= 0) {
                 id(relay_2).turn_on();
                 id(regulator_opening).publish_state(3.0 * level - 200.0);
               } else {
@@ -90,7 +94,7 @@ number:
               // 33-66%: Relay 1 ON, dimmer controls remainder
               id(relay_2).turn_off();
               id(relay_3).turn_off();
-              if (id(relay_1_countdown).state <= 0) {
+              if (id(g_cd1) <= 0) {
                 id(relay_1).turn_on();
                 id(regulator_opening).publish_state(3.0 * level - 100.0);
               } else {
@@ -149,6 +153,9 @@ number:
       then:
         - lambda: |-
             const float duration = id(relay_duration).state;
+            id(g_cd1) = duration;
+            id(g_cd2) = duration;
+            id(g_cd3) = duration;
             id(relay_1_countdown).publish_state(duration);
             id(relay_2_countdown).publish_state(duration);
             id(relay_3_countdown).publish_state(duration);

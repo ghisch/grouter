@@ -17,3 +17,15 @@ globals:
     type: bool
     initial_value: ${power_meter_activated_at_start}
     restore_value: true
+
+  # Relay countdown trackers (in regulation cycles)
+  # Using globals instead of sensor state to avoid filter chain issues
+  - id: g_cd1
+    type: float
+    initial_value: "${relay_anti_cycle_duration}"
+  - id: g_cd2
+    type: float
+    initial_value: "${relay_anti_cycle_duration}"
+  - id: g_cd3
+    type: float
+    initial_value: "${relay_anti_cycle_duration}"

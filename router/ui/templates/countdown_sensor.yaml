@@ -16,5 +16,3 @@ accuracy_decimals: 0
 filters:
   - clamp:
       min_value: 0
-  # Only send to HA when value changes by at least 1
-  - delta: 1.0

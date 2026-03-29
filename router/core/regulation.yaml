@@ -8,14 +8,6 @@ script:
   # --------------------------------------------------------------------------
   # Main Energy Regulation Script
   # --------------------------------------------------------------------------
-  # Calculates the delta percentage to apply to router level to approach
-  # the target grid exchange. Uses a proportional control algorithm where
-  # steps get smaller as we approach the target (prevents oscillation).
-  #
-  # The reactivity parameter controls how aggressively we adjust:
-  #   - Higher reactivity = faster response, but may overshoot
-  #   - Lower reactivity = smoother response, but slower to reach target
-  # --------------------------------------------------------------------------
   - id: energy_regulation
     mode: single
     then:
@@ -24,13 +16,16 @@ script:
           if (isnan(id(real_power).state) || id(safety_limit)) {
             id(router_level).publish_state(0);
             const float duration = id(relay_duration).state;
+            id(g_cd1) = duration;
+            id(g_cd2) = duration;
+            id(g_cd3) = duration;
             id(relay_1_countdown).publish_state(duration);
             id(relay_2_countdown).publish_state(duration);
             id(relay_3_countdown).publish_state(duration);
             return;
           }
 
-          // Get current states (cache to avoid repeated lookups)
+          // Get current states
           const double power = id(real_power).state;
           const double target = id(target_grid_exchange).state;
           const double current_level = id(router_level).state;
@@ -42,8 +37,6 @@ script:
             : id(reactivity).state;
 
           // Calculate proportional adjustment
-          // Negative power difference = exporting = increase router level
-          // Positive power difference = importing = decrease router level
           const double delta = -(power - target) * react / ${regulation_power_divisor};
 
           // Apply delta and clamp to valid range
@@ -54,60 +47,58 @@ script:
           constexpr double threshold_2 = ${thresholds_relay_2};
           constexpr double threshold_3 = ${thresholds_relay_3};
 
-          // Snap to relay thresholds when close from below.
-          // The proportional controller approaches thresholds asymptotically
-          // (delta shrinks as grid power approaches 0), so without snapping
-          // the level gets stuck just below the threshold and the relay
-          // countdown never starts.
-          constexpr double snap_margin = 1.0;  // snap within 1% of threshold
+          // Snap to relay thresholds when close from below
+          constexpr double snap_margin = 1.0;
           if (new_level > threshold_1 - snap_margin && new_level < threshold_1) new_level = threshold_1;
           if (new_level > threshold_2 - snap_margin && new_level < threshold_2) new_level = threshold_2;
           if (new_level > threshold_3 - snap_margin && new_level < threshold_3) new_level = threshold_3;
 
-          // Calculate new countdown values in REGULATION CYCLES (not seconds!)
-          // Countdowns decrement by 1 each time this script runs.
-          // Script triggers on: power meter changes OR every ${regulation_interval}s
-          double new_cd1, new_cd2, new_cd3;
+          // Read countdowns from globals (not sensor state - avoids filter issues)
+          double cd1 = id(g_cd1);
+          double cd2 = id(g_cd2);
+          double cd3 = id(g_cd3);
 
           if (new_level >= threshold_3) {
-            // All relays should be ON - count down relay 3
-            new_cd3 = id(relay_3_countdown).state - 1;
-            new_cd2 = 0;
-            new_cd1 = 0;
+            cd3 -= 1;
+            cd2 = 0;
+            cd1 = 0;
           } else if (new_level >= threshold_2) {
-            // Relays 1+2 should be ON - count down relay 2
-            if (id(relay_2_countdown).state > 0) {
-              new_level = threshold_2;  // Hold at threshold until countdown expires
-            }
-            new_cd3 = duration;
-            new_cd2 = id(relay_2_countdown).state - 1;
-            new_cd1 = 0;
+            if (cd2 > 0) new_level = threshold_2;
+            cd3 = duration;
+            cd2 -= 1;
+            cd1 = 0;
           } else if (new_level >= threshold_1) {
-            // Relay 1 should be ON - count down relay 1
-            if (id(relay_1_countdown).state > 0) {
-              new_level = threshold_1;  // Hold at threshold until countdown expires
-            }
-            new_cd3 = duration;
-            new_cd2 = duration;
-            new_cd1 = id(relay_1_countdown).state - 1;
+            if (cd1 > 0) new_level = threshold_1;
+            cd3 = duration;
+            cd2 = duration;
+            cd1 -= 1;
           } else {
-            // No relays needed - reset all countdowns
-            new_cd3 = duration;
-            new_cd2 = duration;
-            new_cd1 = duration;
+            cd3 = duration;
+            cd2 = duration;
+            cd1 = duration;
           }
 
-          // Only publish if values changed (reduces HA traffic)
-          if (id(relay_1_countdown).state != new_cd1) id(relay_1_countdown).publish_state(new_cd1);
-          if (id(relay_2_countdown).state != new_cd2) id(relay_2_countdown).publish_state(new_cd2);
-          if (id(relay_3_countdown).state != new_cd3) id(relay_3_countdown).publish_state(new_cd3);
-          if (current_level != new_level) id(router_level).publish_state(new_level);
+          // Clamp countdowns
+          if (cd1 < 0) cd1 = 0;
+          if (cd2 < 0) cd2 = 0;
+          if (cd3 < 0) cd3 = 0;
+
+          // Store back to globals
+          id(g_cd1) = cd1;
+          id(g_cd2) = cd2;
+          id(g_cd3) = cd3;
+
+          // Update display sensors
+          id(relay_1_countdown).publish_state(cd1);
+          id(relay_2_countdown).publish_state(cd2);
+          id(relay_3_countdown).publish_state(cd3);
+
+          // Always publish to trigger on_value relay logic
+          // (relay activation depends on on_value seeing updated countdowns)
+          id(router_level).publish_state(new_level);
 
 # --------------------------------------------------------------------------
 # Regulation Trigger (Fallback)
-# --------------------------------------------------------------------------
-# Primary: Triggered on every power sensor value change (in power_meter_ha.yaml)
-# Fallback: Triggered every X seconds if no value changes occur
 # --------------------------------------------------------------------------
 interval:
   - interval: ${regulation_interval}s
